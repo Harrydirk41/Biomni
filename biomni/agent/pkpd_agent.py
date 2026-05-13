@@ -8,10 +8,9 @@ knowledge into the agent's reasoning context.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from biomni.agent.a1 import A1
-from biomni.config import BiomniConfig
+from biomni.know_how import KnowHowLoader
 
 
 PKPD_SYSTEM_CONTEXT = """
@@ -140,6 +139,10 @@ class PKPDAgent(A1):
         )
         self._register_pkpd_tools()
         self._inject_pkpd_context()
+        # Prepend pharmacometric domain rules to the system prompt.
+        # system_prompt is read by reference in the LangGraph generate node,
+        # so patching here takes effect on every subsequent agent.go() call.
+        self.system_prompt = PKPD_SYSTEM_CONTEXT + "\n\n" + self.system_prompt
         print("🔬 PKPDAgent ready — DMPK, NCA, PopPK, PBPK, and bioanalytical tools loaded.")
 
     def _register_pkpd_tools(self):
@@ -168,10 +171,8 @@ class PKPDAgent(A1):
 
     def _inject_pkpd_context(self):
         """Inject pharmacometric domain knowledge into the know-how loader."""
-        from biomni.knowhow.loader import KnowHowLoader
-
         pkpd_knowhow_dir = os.path.join(
-            os.path.dirname(__file__), "..", "knowhow", "pkpd"
+            os.path.dirname(__file__), "..", "know_how", "pkpd"
         )
         pkpd_knowhow_dir = os.path.normpath(pkpd_knowhow_dir)
 
