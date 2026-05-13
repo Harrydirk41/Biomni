@@ -1,0 +1,76 @@
+# Optional: deploy SGLang (Qwen-32B) on GPU nodes alongside the Biomni API.
+# Only apply if you want a fully local LLM instead of Bedrock.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sglang
+  namespace: biomni
+  labels:
+    app: sglang
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sglang
+  template:
+    metadata:
+      labels:
+        app: sglang
+    spec:
+      nodeSelector:
+        workload: gpu
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "spot"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      containers:
+        - name: sglang
+          image: lmsysorg/sglang:latest
+          args:
+            - python
+            - -m
+            - sglang.launch_server
+            - --model-path
+            - Qwen/QwQ-32B
+            - --port
+            - "30000"
+            - --tp
+            - "1"
+          ports:
+            - containerPort: 30000
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              memory: 60Gi
+            requests:
+              memory: 40Gi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 30000
+            initialDelaySeconds: 180
+            periodSeconds: 20
+      volumes:
+        - name: model-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang-svc
+  namespace: biomni
+spec:
+  selector:
+    app: sglang
+  ports:
+    - port: 30000
+      targetPort: 30000
+  type: ClusterIP

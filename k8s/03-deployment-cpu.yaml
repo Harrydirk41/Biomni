@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: biomni-api
+  namespace: biomni
+  labels:
+    app: biomni-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: biomni-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: biomni-api
+    spec:
+      # Schedule on CPU spot node group
+      nodeSelector:
+        workload: cpu
+      tolerations:
+        - key: "spot"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+
+      # Pull image from ECR using IRSA or node role
+      imagePullSecrets: []
+
+      containers:
+        - name: biomni
+          # IMAGE is replaced by CI/CD: ACCOUNT.dkr.ecr.REGION.amazonaws.com/biomni:SHA
+          image: ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/biomni:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+            - name: gradio
+              containerPort: 7860
+          env:
+            - name: BIOMNI_DATA_PATH
+              value: /data
+            - name: LLM_SOURCE
+              value: Bedrock
+            - name: BIOMNI_LLM
+              value: anthropic.claude-sonnet-4-5
+            - name: BIOMNI_COMMERCIAL_MODE
+              value: "false"
+          envFrom:
+            - secretRef:
+                name: biomni-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "2"
+              memory: 16Gi
+            limits:
+              cpu: "4"
+              memory: 30Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 5
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: biomni-data

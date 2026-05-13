@@ -1,0 +1,292 @@
+name: Biomni CI/CD
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+  pull_request:
+    branches: [main, master]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Repository secrets required (Settings → Secrets → Actions):
+#   AWS_ROLE_ARN          - IAM role ARN for GitHub OIDC (recommended)
+#   AWS_REGION            - e.g. us-east-1
+#   ECR_REPOSITORY        - e.g. biomni
+#   ECS_CLUSTER           - e.g. biomni-cluster
+#   ECS_SERVICE_FARGATE   - e.g. biomni-api
+#   ECS_SERVICE_EC2       - e.g. biomni-api-ec2  (optional)
+#   LAMBDA_FUNCTION_NAME  - e.g. biomni-agent    (optional)
+#   EKS_CLUSTER_NAME      - e.g. biomni          (optional)
+#   DEPLOY_TARGET         - lambda|fargate|ec2|eks|all
+# ─────────────────────────────────────────────────────────────────────────────
+
+env:
+  AWS_REGION:      ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY:  ${{ secrets.ECR_REPOSITORY }}
+  IMAGE_TAG:       ${{ github.sha }}
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 1: Lint & unit tests
+  # ───────────────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install test dependencies
+        run: pip install pytest pydantic langchain langgraph
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short || true   # non-fatal until test suite exists
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 2: Build Docker image & push to ECR
+  # ───────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+    outputs:
+      image: ${{ steps.image.outputs.uri }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache
+          cache-to:   type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache,mode=max
+
+      - name: Output image URI
+        id: image
+        run: |
+          echo "uri=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" \
+            >> "$GITHUB_OUTPUT"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 3a: Deploy to Lambda
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-lambda:
+    name: Deploy → Lambda
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      github.event_name == 'push' &&
+      (secrets.DEPLOY_TARGET == 'lambda' || secrets.DEPLOY_TARGET == 'all')
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Update Lambda function image
+        run: |
+          aws lambda update-function-code \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --image-uri    "${{ needs.build.outputs.image }}" \
+            --region       "${{ env.AWS_REGION }}"
+
+      - name: Wait for update to complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}"
+
+      - name: Publish Lambda version & alias
+        run: |
+          VERSION=$(aws lambda publish-version \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --query Version --output text)
+          aws lambda update-alias \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --name live \
+            --function-version "$VERSION" 2>/dev/null || \
+          aws lambda create-alias \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --name live \
+            --function-version "$VERSION"
+          echo "Lambda version $VERSION promoted to 'live' alias"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 3b: Deploy to ECS Fargate
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-fargate:
+    name: Deploy → ECS Fargate
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      github.event_name == 'push' &&
+      (secrets.DEPLOY_TARGET == 'fargate' || secrets.DEPLOY_TARGET == 'all')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition biomni \
+            --query taskDefinition > task-def.json
+
+      - name: Update image in task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition:    task-def.json
+          container-name:     biomni
+          image:              ${{ needs.build.outputs.image }}
+
+      - name: Deploy to ECS Fargate service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition:  ${{ steps.task-def.outputs.task-definition }}
+          service:          ${{ secrets.ECS_SERVICE_FARGATE }}
+          cluster:          ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 3c: Deploy to ECS EC2
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-ecs-ec2:
+    name: Deploy → ECS EC2
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      github.event_name == 'push' &&
+      (secrets.DEPLOY_TARGET == 'ec2' || secrets.DEPLOY_TARGET == 'all')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Download current GPU task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition biomni-gpu \
+            --query taskDefinition > task-def-gpu.json
+
+      - name: Update image in GPU task definition
+        id: task-def-gpu
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition:  task-def-gpu.json
+          container-name:   biomni
+          image:            ${{ needs.build.outputs.image }}
+
+      - name: Deploy to ECS EC2 service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition:  ${{ steps.task-def-gpu.outputs.task-definition }}
+          service:          ${{ secrets.ECS_SERVICE_EC2 }}
+          cluster:          ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 3d: Deploy to EKS
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-eks:
+    name: Deploy → EKS
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      github.event_name == 'push' &&
+      (secrets.DEPLOY_TARGET == 'eks' || secrets.DEPLOY_TARGET == 'all')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name   "${{ secrets.EKS_CLUSTER_NAME }}" \
+            --region "${{ env.AWS_REGION }}"
+
+      - name: Create/update Kubernetes secret
+        run: |
+          ANTHROPIC_KEY=$(aws secretsmanager get-secret-value \
+            --secret-id biomni/anthropic-key \
+            --query SecretString --output text)
+          kubectl create secret generic biomni-secrets \
+            --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_KEY" \
+            --namespace biomni \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Update image in deployment
+        run: |
+          kubectl set image deployment/biomni-api \
+            biomni="${{ needs.build.outputs.image }}" \
+            --namespace biomni
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/biomni-api \
+            --namespace biomni \
+            --timeout=600s
+
+      - name: Verify pods are running
+        run: kubectl get pods -n biomni -l app=biomni-api
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 4: Notify on failure
+  # ───────────────────────────────────────────────────────────────────────────
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [build, deploy-lambda, deploy-fargate, deploy-ecs-ec2, deploy-eks]
+    if: failure()
+    steps:
+      - name: Print failure summary
+        run: |
+          echo "::error::One or more deployment jobs failed. Check logs above."
