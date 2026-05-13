@@ -148,6 +148,150 @@ agent.go("Perform scRNA-seq annotation at [PATH] and generate meaningful hypothe
 agent.go("Predict ADMET properties for this compound: CC(C)CC1=CC=C(C=C1)C(C)C(=O)O")
 ```
 
+---
+
+## 🧪 PKPD / DMPK Agent
+
+Biomni ships a specialized sub-agent — **`PKPDAgent`** — pre-loaded with tools and domain knowledge for pharmacokinetics, pharmacodynamics, drug metabolism, and bioanalytics (PKDMB) workflows. It is a drop-in replacement for `A1` that additionally:
+
+- Registers five PKPD tool modules (NCA, population PK, PBPK, bioanalytical, CDISC I/O)
+- Injects pharmacometric domain rules (GOF criteria, DDI thresholds, RSE guidelines, regulatory citations) into every LLM call
+- Loads three curated know-how skill documents covering NCA, DMPK assay interpretation, and population PK diagnostics
+
+### PKPD Environment Setup
+
+Install R packages (PKNCA, nlmixr2, mrgsolve, rxode2, xpose, vpc, …):
+
+```bash
+conda activate biomni_e1
+Rscript pkpd_env/install_r_packages.R   # ~15 min on first run
+```
+
+Install additional Python dependencies:
+
+```bash
+pip install -r pkpd_env/pkpd_requirements.txt
+```
+
+### Quick Start
+
+```python
+from biomni.agent.pkpd_agent import PKPDAgent
+
+agent = PKPDAgent(
+    path="./data",
+    llm="claude-sonnet-4-20250514",
+    source="Anthropic",
+    expected_data_lake_files=[],   # skip 11 GB datalake for PKPD-only work
+)
+
+# Plain natural language — the agent selects the right tool automatically
+agent.go("Run NCA on the concentration-time data in ./data/pk_study.csv")
+agent.go("What is the DDI risk for a compound with CYP3A4 IC50 = 0.8 µM and Cmax = 2 µM?")
+agent.go("Fit a two-compartment population PK model to the nlmixr2 dataset at ./data/popPK.csv")
+```
+
+### Pre-built Workflow Methods
+
+High-level workflows are available as direct methods — they build a structured multi-step prompt and call `agent.go()` internally.
+
+#### Non-Compartmental Analysis (NCA)
+
+```python
+# Full NCA pipeline: validate → run PKNCA → summarise → classify clearance
+result = agent.run_nca_workflow(
+    dataset_path="./data/plasma_pk.csv",
+    output_dir="./results/nca",
+)
+print(result)
+```
+
+Expected outputs: AUClast, AUCinf, Cmax, Tmax, t½, CL/F, Vd/F per subject; geometric mean table; lambda-z quality flags; concentration–time plot.
+
+#### Population PK Analysis
+
+```python
+# End-to-end popPK: validate → nlmixr2 SAEM → GOF plots → VPC → simulation
+result = agent.run_poppk_workflow(
+    dataset_path="./data/popPK_nonmem.csv",
+    model_type="2cmt_oral",          # 1cmt_iv | 2cmt_iv | 2cmt_oral | 3cmt_oral
+    output_dir="./results/poppk",
+)
+```
+
+Model types available: `1cmt_iv`, `2cmt_iv`, `1cmt_oral`, `2cmt_oral`, `3cmt_oral`, `emax`, `indirect_response`.
+
+#### DMPK Panel
+
+```python
+# Integrated ADME panel: stability → PPB → Caco-2 → CYP inhibition → DDI risk
+result = agent.run_dmpk_panel(
+    compound_name="Compound-A",
+    microsomal_data={
+        "time_points": [0, 5, 10, 20, 40, 60],
+        "percent_remaining": [100, 85, 72, 52, 31, 19],
+        "microsomal_protein_conc_mg_per_mL": 0.5,
+    },
+    ppb_data={
+        "buffer_conc": 1.0,
+        "plasma_conc": 0.05,
+        "method": "RED",
+    },
+    permeability_data={
+        "apical_to_basolateral_conc": [0.0, 0.85],
+        "basolateral_to_apical_conc": [0.0, 0.12],
+        "donor_conc_initial": 10.0,
+        "incubation_time_h": 2.0,
+        "insert_area_cm2": 0.33,
+        "volume_donor_mL": 0.1,
+        "volume_receiver_mL": 0.6,
+    },
+    cyp_data={
+        "CYP3A4": {"inhibitor_conc_uM": [0.01, 0.1, 1, 10, 100],
+                   "percent_activity": [98, 92, 65, 25, 5]},
+        "CYP2D6": {"inhibitor_conc_uM": [0.01, 0.1, 1, 10, 100],
+                   "percent_activity": [99, 97, 90, 72, 30]},
+    },
+    cmax_uM=2.5,
+)
+```
+
+### Individual Tool Functions
+
+All tools can also be called directly via `agent.go()` with free-text instructions:
+
+| Module | Key Functions |
+|---|---|
+| `dmpk` | `run_nca`, `calculate_microsomal_stability`, `calculate_plasma_protein_binding`, `calculate_permeability`, `fit_cyp_inhibition`, `predict_ddi_risk_static`, `ivive_clearance`, `summarise_adme_profile` |
+| `poppk` | `generate_nonmem_control_stream`, `parse_nonmem_output`, `run_nlmixr2_model`, `run_mrgsolve_simulation`, `run_covariate_analysis`, `compare_pk_models` |
+| `pbpk` | `run_minimal_pbpk_model`, `predict_human_pk_from_preclinical`, `calculate_allometric_dose` |
+| `bioanalytical` | `fit_calibration_curve`, `assess_method_validation`, `process_lc_ms_concentrations` |
+| `cdisc_io` | `read_sdtm_pc`, `read_adam_adpc`, `format_nca_results_as_pp_domain`, `validate_pk_dataset_for_nonmem` |
+
+### PKPD Know-How Skills
+
+Three pharmacometric reference documents are automatically loaded into every `PKPDAgent` call:
+
+| Skill document | Covers |
+|---|---|
+| `nca_and_pk_modeling.md` | Lambda-z selection rules, AUC trapezoidal method, compartment model selection, error models, IIV, food effect |
+| `dmpk_and_ddi.md` | Microsomal stability thresholds, PPB fu classification, Caco-2 BCS classes, CYP IC50 risk tiers, FDA 2020 DDI R1/R2 workflow |
+| `population_pk_diagnostics.md` | GOF/VPC interpretation, shrinkage rules, RSE acceptance criteria, covariate analysis, FDA/EMA submission checklist |
+
+Files live in `biomni/know_how/pkpd/`. Add your own `.md` files there to extend the agent's domain knowledge — the loader picks them up automatically.
+
+### AWS Deployment
+
+To deploy `PKPDAgent` on AWS (Lambda → ECS Fargate → ECS EC2 → EKS → Raw EC2), follow the step-by-step guide:
+
+```
+docs/aws-deployment-guide.md
+```
+
+The guide covers Docker multi-stage builds, ECS task definitions, EKS manifests with GPU node support, CI/CD via GitHub Actions (OIDC, no long-lived keys), and GxP-compliant image tagging for regulatory submissions.
+
+---
+
 #### Controlling Datalake Loading
 
 By default, Biomni automatically downloads the datalake files (~11GB) when you create an agent. You can control this behavior:
