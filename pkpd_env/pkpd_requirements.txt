@@ -1,0 +1,40 @@
+# Biomni PKPD Python dependencies
+# Install into existing biomni_e1 conda environment:
+#   conda activate biomni_e1
+#   pip install -r pkpd_env/pkpd_requirements.txt
+
+# ODE solving (already in biomni_env but pinned here for clarity)
+scipy>=1.11.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# SAS/XPT file reading (CDISC SDTM/ADaM)
+pyreadstat>=1.2.0
+
+# Pharmacometric Python tools
+pumas-julia>=0.1.0       ; python_version >= "3.9"   # optional: Julia-based NLME
+
+# PK/PD simulation (Python-native)
+pkpdsim>=0.4.0            ; python_version >= "3.8"
+
+# Plotting
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Report generation
+jinja2>=3.1.0
+reportlab>=4.0.0
+
+# Data validation
+pydantic>=2.0.0
+cerberus>=1.3.5
+
+# R interface (optional: allows calling R functions from Python)
+rpy2>=3.5.0
+
+# Biostatistics
+statsmodels>=0.14.0
+pingouin>=0.5.3
+
+# Allometry and scaling utilities
+allopy>=0.4.0              ; python_version >= "3.8"
