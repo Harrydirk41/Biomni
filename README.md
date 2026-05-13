@@ -280,6 +280,85 @@ Three pharmacometric reference documents are automatically loaded into every `PK
 
 Files live in `biomni/know_how/pkpd/`. Add your own `.md` files there to extend the agent's domain knowledge — the loader picks them up automatically.
 
+### LangSmith Benchmark
+
+The PKPD benchmark uses LangSmith `evaluate()` to score the agent across three layers and log every result as a named experiment in the LangSmith UI — making it easy to compare models, prompt changes, or tool updates side by side.
+
+**Evaluation layers:**
+
+| Layer | Cases | Metric | How it works |
+|---|---|---|---|
+| Numerical accuracy | NCA params, CLint, DDI R1 | `numerical_accuracy` | Agent returns JSON; each value checked against ground truth within tolerance (10–15%) |
+| Classification accuracy | Clearance class, risk tier, boolean flags | `classification_accuracy` | Same JSON; categorical fields compared exactly |
+| Reasoning quality | GOF, shrinkage, TDI, VPC interpretation | `reasoning_quality` | Required keywords must appear; forbidden keywords penalise the score |
+| Workflow completeness | Full NCA report, DMPK panel | `workflow_completeness` | Fraction of required reporting terms present in agent output |
+
+**Setup (one-time):**
+
+```bash
+pip install langsmith          # already in pkpd_requirements.txt
+
+# Set env vars in .env
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls__your_key
+LANGCHAIN_PROJECT=biomni-pkpd
+
+# Upload the 16-case dataset to LangSmith
+python -m biomni.eval.pkpd_benchmark --upload-dataset
+```
+
+**Run benchmark:**
+
+```bash
+# Baseline run with Sonnet
+python -m biomni.eval.pkpd_benchmark --run --experiment pkpd-sonnet
+
+# Compare against Opus
+python -m biomni.eval.pkpd_benchmark --run \
+  --model claude-opus-4-7-20250514 \
+  --experiment pkpd-opus
+```
+
+Both experiments appear in the LangSmith UI under the same project — click **Compare** to see side-by-side scores per case.
+
+**Programmatic usage:**
+
+```python
+from biomni.agent.pkpd_agent import PKPDAgent, enable_langsmith
+from biomni.eval.pkpd_benchmark import upload_dataset, run_benchmark
+
+enable_langsmith(project="biomni-pkpd-dev")
+upload_dataset()   # once
+
+agent = PKPDAgent(llm="claude-sonnet-4-20250514", expected_data_lake_files=[])
+results = run_benchmark(agent, experiment_prefix="pkpd-sonnet", model_label="sonnet-4-6")
+
+df = results.to_pandas()
+print(df[["example_id", "feedback.numerical_accuracy", "feedback.reasoning_quality"]])
+```
+
+**What the benchmark covers (16 cases total):**
+
+```
+Layer 1 — Numerical (6 cases)
+  NCA:   1-cmt IV 100 mg, 1-cmt oral 50 mg
+  CLint: high clearance (t½≈12 min), low clearance (t½≈90 min)
+  DDI:   R1=1.40 (clinical study required), R1=1.0005 (no action)
+
+Layer 2 — Decision (6 cases)
+  GOF:       U-shaped CWRES, fan-shaped CWRES
+  Shrinkage: ETA 45% → EBEs unreliable
+  VPC:       PI too wide → over-estimated IIV
+  RSE:       OMEGA 85% → model unstable
+  TDI:       IC50 shift ≥1.5 → mechanism-based inhibition
+
+Layer 3 — Workflow (2 cases)
+  NCA report completeness (8 required terms)
+  DMPK panel completeness (8 required terms)
+```
+
+> To add cases, append to `NCA_CASES`, `DECISION_CASES`, etc. in `biomni/eval/pkpd_benchmark.py` and re-run `--upload-dataset`.
+
 ### LangSmith Observability
 
 [LangSmith](https://smith.langchain.com) is LangChain's tracing platform. Because Biomni uses LangGraph under the hood, every agent run is automatically traced once the three `LANGCHAIN_*` environment variables are set — no changes to the graph code are needed.
