@@ -154,7 +154,14 @@ if [ -z "$EFS_ID" ] || [ "$EFS_ID" = "None" ]; then
     --encrypted \
     --tags Key=Name,Value="$PROJECT-data" \
     --query FileSystemId --output text)
-  aws efs wait file-system-available --file-system-id "$EFS_ID"
+  echo "Waiting for EFS to become available..."
+  for i in $(seq 1 30); do
+    STATE=$(aws efs describe-file-systems --file-system-id "$EFS_ID" \
+      --query "FileSystems[0].LifeCycleState" --output text)
+    [ "$STATE" = "available" ] && break
+    echo "  EFS state: $STATE (attempt $i/30)..."
+    sleep 5
+  done
 fi
 echo "EFS ID: $EFS_ID"
 
