@@ -38,3 +38,6 @@ pingouin>=0.5.3
 
 # Allometry and scaling utilities
 allopy>=0.4.0              ; python_version >= "3.8"
+
+# Observability (LangSmith tracing for LangGraph runs)
+langsmith>=0.1.0

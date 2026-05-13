@@ -280,6 +280,65 @@ Three pharmacometric reference documents are automatically loaded into every `PK
 
 Files live in `biomni/know_how/pkpd/`. Add your own `.md` files there to extend the agent's domain knowledge — the loader picks them up automatically.
 
+### LangSmith Observability
+
+[LangSmith](https://smith.langchain.com) is LangChain's tracing platform. Because Biomni uses LangGraph under the hood, every agent run is automatically traced once the three `LANGCHAIN_*` environment variables are set — no changes to the graph code are needed.
+
+**Install:**
+
+```bash
+pip install langsmith        # already in pkpd_requirements.txt
+```
+
+**Option 1 — environment variables (recommended for production):**
+
+Add to your `.env` file (copy from `.env.example`):
+
+```env
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls__your_key_here
+LANGCHAIN_PROJECT=biomni-pkpd
+```
+
+Then run as normal — tracing starts automatically:
+
+```python
+from biomni.agent.pkpd_agent import PKPDAgent
+
+agent = PKPDAgent(path="./data", llm="claude-sonnet-4-20250514")
+agent.go("Run NCA on ./data/pk_study.csv")
+# → run appears in LangSmith UI under project "biomni-pkpd"
+```
+
+**Option 2 — programmatic, per-session:**
+
+```python
+from biomni.agent.pkpd_agent import PKPDAgent, enable_langsmith
+
+enable_langsmith(
+    api_key="ls__your_key_here",   # or omit if LANGCHAIN_API_KEY is set
+    project="biomni-pkpd-dev",
+)
+
+agent = PKPDAgent(path="./data", llm="claude-sonnet-4-20250514")
+agent.go("Fit a 2-compartment popPK model to ./data/dataset.csv")
+```
+
+**What you see in LangSmith:**
+
+| Field | Content |
+|---|---|
+| Run name | LangGraph node that was executing (`generate`, tool call, etc.) |
+| Inputs | The full message list sent to the LLM |
+| Outputs | LLM response with tool-use blocks |
+| Latency | Per-node and total wall-clock time |
+| Token usage | Input / output / total tokens per call |
+| Errors | Any exception raised inside a graph node |
+
+This is especially useful for debugging long PKPD workflows where the agent chains NCA → covariate analysis → simulation across many LLM calls.
+
+> **Note:** LangSmith is a product of LangChain Inc. and is independent of Anthropic. The free tier covers 5,000 traces/month. See [smith.langchain.com](https://smith.langchain.com) for pricing.
+
 ### AWS Deployment
 
 To deploy `PKPDAgent` on AWS (Lambda → ECS Fargate → ECS EC2 → EKS → Raw EC2), follow the step-by-step guide:

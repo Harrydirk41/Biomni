@@ -13,6 +13,59 @@ from biomni.agent.a1 import A1
 from biomni.know_how import KnowHowLoader
 
 
+def enable_langsmith(
+    api_key: str | None = None,
+    project: str = "biomni-pkpd",
+    endpoint: str = "https://api.smith.langchain.com",
+) -> None:
+    """Enable LangSmith tracing for all subsequent LangGraph runs.
+
+    LangGraph automatically sends traces to LangSmith when the three
+    LANGCHAIN_* environment variables are set.  Call this once before
+    creating a PKPDAgent (or any A1 agent) to activate tracing.
+
+    Parameters
+    ----------
+    api_key:
+        LangSmith API key.  Falls back to the LANGCHAIN_API_KEY env var
+        if not supplied.  Get one at https://smith.langchain.com.
+    project:
+        Project name shown in the LangSmith UI.  All runs from this
+        session will be grouped under this project.
+    endpoint:
+        LangSmith ingest endpoint.  The default is correct for the
+        hosted service; only change for self-hosted deployments.
+
+    Raises
+    ------
+    EnvironmentError
+        If no API key is provided and LANGCHAIN_API_KEY is not set.
+    ImportError
+        If the ``langsmith`` package is not installed.
+    """
+    try:
+        import langsmith  # noqa: F401 — just verify the package is present
+    except ImportError as exc:
+        raise ImportError(
+            "langsmith is not installed. "
+            "Run: pip install langsmith"
+        ) from exc
+
+    resolved_key = api_key or os.environ.get("LANGCHAIN_API_KEY")
+    if not resolved_key:
+        raise EnvironmentError(
+            "No LangSmith API key found.  Pass api_key= or set "
+            "LANGCHAIN_API_KEY in your environment / .env file."
+        )
+
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = resolved_key
+    os.environ["LANGCHAIN_PROJECT"] = project
+    os.environ["LANGCHAIN_ENDPOINT"] = endpoint
+
+    print(f"LangSmith tracing enabled → project: '{project}'  endpoint: {endpoint}")
+
+
 PKPD_SYSTEM_CONTEXT = """
 You are a pharmacometrics and DMPK AI assistant with expertise in:
 
