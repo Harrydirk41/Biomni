@@ -244,7 +244,7 @@ aws ecs register-task-definition \
         \"fileSystemId\": \"$EFS_ID\",
         \"transitEncryption\": \"ENABLED\",
         \"authorizationConfig\": {
-          \"accessPointId\": \"$(echo $EFS_AP | sed 's|.*access-points/||')\"
+          \"accessPointId\": \"$(echo $EFS_AP | grep -oE 'fsap-[a-f0-9]+')\"
         }
       }
     }
