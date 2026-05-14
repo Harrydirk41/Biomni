@@ -200,8 +200,7 @@ jobs:
     needs: build
     if: |
       github.event_name == 'push' &&
-      (secrets.DEPLOY_TARGET == 'lambda' || secrets.DEPLOY_TARGET == 'all' ||
-       inputs.deploy_target == 'lambda' || inputs.deploy_target == 'all')
+      (inputs.deploy_target == 'lambda' || inputs.deploy_target == 'all')
 
     steps:
       - name: Configure AWS credentials
@@ -245,8 +244,8 @@ jobs:
     needs: build
     if: |
       github.event_name == 'push' &&
-      (secrets.DEPLOY_TARGET == 'fargate' || secrets.DEPLOY_TARGET == 'all' ||
-       inputs.deploy_target == 'fargate' || inputs.deploy_target == 'all')
+      (inputs.deploy_target == 'fargate' || inputs.deploy_target == 'all' ||
+       inputs.deploy_target == '')
 
     steps:
       - uses: actions/checkout@v4
@@ -288,8 +287,7 @@ jobs:
     needs: build
     if: |
       github.event_name == 'push' &&
-      (secrets.DEPLOY_TARGET == 'ec2' || secrets.DEPLOY_TARGET == 'all' ||
-       inputs.deploy_target == 'ec2' || inputs.deploy_target == 'all')
+      (inputs.deploy_target == 'ec2' || inputs.deploy_target == 'all')
 
     steps:
       - uses: actions/checkout@v4
@@ -331,8 +329,7 @@ jobs:
     needs: build
     if: |
       github.event_name == 'push' &&
-      (secrets.DEPLOY_TARGET == 'eks' || secrets.DEPLOY_TARGET == 'all' ||
-       inputs.deploy_target == 'eks' || inputs.deploy_target == 'all')
+      (inputs.deploy_target == 'eks' || inputs.deploy_target == 'all')
 
     steps:
       - uses: actions/checkout@v4
