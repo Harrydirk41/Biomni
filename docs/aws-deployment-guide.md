@@ -168,7 +168,7 @@ The easiest way to trigger this and confirm access is a quick test call:
 
 ```bash
 aws bedrock-runtime invoke-model \
-  --model-id anthropic.claude-3-5-sonnet-20241022-v2:0 \
+  --model-id anthropic.claude-3-5-haiku-20241022-v1:0 \
   --region us-west-2 \
   --body '{"anthropic_version":"bedrock-2023-05-31","max_tokens":16,"messages":[{"role":"user","content":"hi"}]}' \
   --cli-binary-format raw-in-base64-out \
@@ -355,11 +355,14 @@ BIOMNI_LLM=anthropic.claude-sonnet-4-5
 ### 5.4 Available Bedrock model IDs for Biomni
 
 ```
-anthropic.claude-sonnet-4-5          ← recommended default
-anthropic.claude-3-5-sonnet-20241022-v2:0
-anthropic.claude-3-haiku-20240307-v1:0   ← cheapest, fastest
-meta.llama3-70b-instruct-v1:0            ← open-weight alternative
+anthropic.claude-sonnet-4-20250514-v1:0   ← recommended (Claude Sonnet 4)
+anthropic.claude-opus-4-20250514-v1:0     ← most capable (Claude Opus 4)
+anthropic.claude-haiku-4-5-20251001-v1:0  ← cheapest / fastest
+anthropic.claude-3-5-haiku-20241022-v1:0  ← cheapest legacy option
 ```
+
+> Run `aws bedrock list-foundation-models --region us-west-2 --query "modelSummaries[?contains(modelId,'claude')].modelId" --output table`
+> to see the exact IDs available in your account.
 
 ### 5.5 VPC Endpoint (optional — fully private traffic)
 
