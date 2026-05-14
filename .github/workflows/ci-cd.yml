@@ -112,6 +112,7 @@ jobs:
             pandas \
             scipy \
             pydantic \
+            tqdm \
             langchain-core \
             langgraph
 
