@@ -31,7 +31,7 @@ def test_valid_dataset_passes(tmp_path):
     path = _write_csv(tmp_path, _valid_df())
     result = validate_pk_dataset_for_nonmem(path)
     assert isinstance(result, str)
-    assert "error" not in result.lower() or "0 error" in result.lower()
+    assert "no blocking errors" in result.lower()
 
 
 def test_missing_required_column_flagged(tmp_path):
