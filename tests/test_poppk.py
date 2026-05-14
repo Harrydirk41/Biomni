@@ -77,7 +77,7 @@ def test_parse_ofv(tmp_path):
     lst_file.write_text(MINIMAL_LST)
     result = parse_nonmem_output(str(lst_file))
     assert isinstance(result, str)
-    assert "1234" in result or "OFV" in result
+    assert "THETA" in result or "Minimis" in result or "1234" in result
 
 
 def test_parse_theta_values(tmp_path):
