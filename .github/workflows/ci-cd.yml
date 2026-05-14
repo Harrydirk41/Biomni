@@ -111,14 +111,16 @@ jobs:
             numpy \
             pandas \
             scipy \
-            pydantic \
             tqdm \
-            python-dotenv \
+            requests \
             langchain-core \
+            langchain-openai \
+            langchain-anthropic \
+            langchain-aws \
             langgraph
 
-      - name: Install biomni package (editable)
-        run: pip install -e . --no-deps
+      - name: Install biomni package (editable, with declared deps)
+        run: pip install -e .
 
       - name: Run PKPD unit tests
         run: |
