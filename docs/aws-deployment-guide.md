@@ -157,10 +157,30 @@ aws secretsmanager put-secret-value \
 
 ### 2.2 Enable Bedrock model access (required for Options B–E)
 
-1. Open the [AWS Bedrock console](https://console.aws.amazon.com/bedrock/home).
-2. Navigate to **Model access → Manage model access**.
-3. Check **Anthropic → Claude** (Sonnet, Haiku) and click **Save changes**.
-4. Wait until status shows **Access granted** (can take a few minutes).
+> **Note (2025):** The "Model access" page in the Bedrock console has been retired.
+> Serverless foundation models are now **automatically enabled** when first invoked —
+> no manual activation step needed.
+
+**For Anthropic models (Claude) only — first-time accounts:**
+
+AWS may prompt you to submit use case details before your first successful invocation.
+The easiest way to trigger this and confirm access is a quick test call:
+
+```bash
+aws bedrock-runtime invoke-model \
+  --model-id anthropic.claude-3-5-sonnet-20241022-v2:0 \
+  --region us-west-2 \
+  --body '{"anthropic_version":"bedrock-2023-05-31","max_tokens":16,"messages":[{"role":"user","content":"hi"}]}' \
+  --cli-binary-format raw-in-base64-out \
+  /tmp/bedrock-test.json && cat /tmp/bedrock-test.json
+```
+
+- If it returns a JSON response → you have access, move to step 3.
+- If it returns an `AccessDeniedException` → go to the
+  [Bedrock Model catalog](https://console.aws.amazon.com/bedrock/home#/models),
+  open the Claude model, and submit the use case form. Access is usually granted within minutes.
+- If it returns `ResourceNotFoundException` → wrong region. Re-run with `--region us-east-1`
+  (Claude is available in us-east-1, us-west-2, eu-west-1, ap-northeast-1).
 
 ---
 
