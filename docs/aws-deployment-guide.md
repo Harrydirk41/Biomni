@@ -164,23 +164,31 @@ aws secretsmanager put-secret-value \
 **For Anthropic models (Claude) only — first-time accounts:**
 
 AWS may prompt you to submit use case details before your first successful invocation.
-The easiest way to trigger this and confirm access is a quick test call:
+Confirm access with this test call (Claude 4 family requires the `us.` inference profile prefix):
 
 ```bash
 aws bedrock-runtime invoke-model \
-  --model-id anthropic.claude-3-5-haiku-20241022-v1:0 \
+  --model-id us.anthropic.claude-haiku-4-5-20251001-v1:0 \
   --region us-west-2 \
   --body '{"anthropic_version":"bedrock-2023-05-31","max_tokens":16,"messages":[{"role":"user","content":"hi"}]}' \
   --cli-binary-format raw-in-base64-out \
   /tmp/bedrock-test.json && cat /tmp/bedrock-test.json
 ```
 
-- If it returns a JSON response → you have access, move to step 3.
-- If it returns an `AccessDeniedException` → go to the
-  [Bedrock Model catalog](https://console.aws.amazon.com/bedrock/home#/models),
-  open the Claude model, and submit the use case form. Access is usually granted within minutes.
-- If it returns `ResourceNotFoundException` → wrong region. Re-run with `--region us-east-1`
-  (Claude is available in us-east-1, us-west-2, eu-west-1, ap-northeast-1).
+Expected successful response:
+```json
+{"model":"claude-haiku-4-5-20251001","type":"message","role":"assistant",
+ "content":[{"type":"text","text":"Hello! How can I help you today?"}],"stop_reason":"end_turn"}
+```
+
+**Common errors and fixes:**
+
+| Error | Cause | Fix |
+|---|---|---|
+| `ResourceNotFoundException: end of life` | Model ID is retired/legacy | Use `us.` prefix + Claude 4 model IDs (see §5.4) |
+| `ValidationException: on-demand throughput isn't supported` | Missing `us.` prefix | Add `us.` prefix — Claude 4 requires cross-region inference profiles |
+| `AccessDeniedException` | Use case not approved | Open [Bedrock Model catalog](https://console.aws.amazon.com/bedrock/home#/models), open the Claude model, submit use case form |
+| `ResourceNotFoundException: wrong region` | Region mismatch | Use `--region us-west-2` (or us-east-1, eu-west-1, ap-northeast-1)
 
 ---
 
@@ -348,21 +356,27 @@ BIOMNI_LLM=anthropic.claude-sonnet-4-5
     "bedrock:InvokeModel",
     "bedrock:InvokeModelWithResponseStream"
   ],
-  "Resource": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-*"
+  "Resource": "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-*"
 }
 ```
 
 ### 5.4 Available Bedrock model IDs for Biomni
 
-```
-anthropic.claude-sonnet-4-20250514-v1:0   ← recommended (Claude Sonnet 4)
-anthropic.claude-opus-4-20250514-v1:0     ← most capable (Claude Opus 4)
-anthropic.claude-haiku-4-5-20251001-v1:0  ← cheapest / fastest
-anthropic.claude-3-5-haiku-20241022-v1:0  ← cheapest legacy option
-```
+All Claude 4 models require the `us.` cross-region inference profile prefix:
 
-> Run `aws bedrock list-foundation-models --region us-west-2 --query "modelSummaries[?contains(modelId,'claude')].modelId" --output table`
-> to see the exact IDs available in your account.
+| Model | Inference profile ID | Use case |
+|---|---|---|
+| Claude Sonnet 4 | `us.anthropic.claude-sonnet-4-20250514-v1:0` | Recommended default |
+| Claude Opus 4 | `us.anthropic.claude-opus-4-20250514-v1:0` | Most capable, higher cost |
+| Claude Haiku 4.5 | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Cheapest / fastest |
+
+> To always get the current list of available model IDs in your account:
+> ```bash
+> aws bedrock list-foundation-models \
+>   --region us-west-2 \
+>   --query "modelSummaries[?contains(modelId,'claude')].modelId" \
+>   --output table
+> ```
 
 ### 5.5 VPC Endpoint (optional — fully private traffic)
 
