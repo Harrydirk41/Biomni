@@ -67,7 +67,7 @@ def read_sdtm_pc(
 
         # Check required variables
         missing = [v for v in PC_REQUIRED if v not in df.columns]
-        log.append(f"\n── SDTM Compliance ──")
+        log.append("\n── SDTM Compliance ──")
         if missing:
             log.append(f"  ⚠ Missing required variables: {', '.join(missing)}")
         else:
@@ -84,7 +84,7 @@ def read_sdtm_pc(
 
         # Summary
         if "USUBJID" in df.columns:
-            log.append(f"\n── Data Coverage ──")
+            log.append("\n── Data Coverage ──")
             log.append(f"  Subjects : {df['USUBJID'].nunique()}")
         if "PCTESTCD" in df.columns:
             log.append(f"  Analytes : {', '.join(df['PCTESTCD'].unique())}")
@@ -185,7 +185,7 @@ def read_adam_adpc(
             df = df[df["PARAM"].str.contains(param_filter, case=False, na=False)]
             log.append(f"PARAM filter '{param_filter}': {len(df)} rows remaining")
 
-        log.append(f"\n── Summary ──")
+        log.append("\n── Summary ──")
         if "USUBJID" in df.columns:
             log.append(f"  Subjects : {df['USUBJID'].nunique()}")
         if "PARAM" in df.columns:
@@ -279,7 +279,7 @@ def format_nca_results_as_pp_domain(
                 pp_seq += 1
 
         pp_df = pd.DataFrame(pp_records)
-        log.append(f"\n── PP Domain Generated ──")
+        log.append("\n── PP Domain Generated ──")
         log.append(f"  Records   : {len(pp_df)}")
         log.append(f"  Subjects  : {pp_df['USUBJID'].nunique()}")
         log.append(f"  Parameters: {', '.join(pp_df['PPTESTCD'].unique())}")
@@ -339,14 +339,14 @@ def validate_pk_dataset_for_nonmem(
                 errors.append(f"Missing required column: {col}")
 
         if errors:
-            log.append(f"\n── ERRORS (must fix) ──")
+            log.append("\n── ERRORS (must fix) ──")
             for e in errors:
                 log.append(f"  ✗ {e}")
             return "\n".join(log)
 
         # Subject summary
         n_subj = df[id_col].nunique()
-        log.append(f"\n── Dataset Summary ──")
+        log.append("\n── Dataset Summary ──")
         log.append(f"  Subjects        : {n_subj}")
         log.append(f"  Dose records    : {(df[evid_col] == 1).sum()}")
         log.append(f"  Obs records     : {(df[evid_col] == 0).sum()}")
@@ -386,7 +386,7 @@ def validate_pk_dataset_for_nonmem(
             n_zero = ((df[evid_col] == 0) & (df[dv_col] == 0)).sum()
             warnings.append(f"{n_zero} obs with DV=0 — confirm these are BLQ (handle with M1-M3 method)")
 
-        log.append(f"\n── Validation Results ──")
+        log.append("\n── Validation Results ──")
         if errors:
             log.append("  ERRORS (must fix before running):")
             for e in errors:
@@ -401,7 +401,7 @@ def validate_pk_dataset_for_nonmem(
         else:
             log.append("  ✓ No warnings.")
 
-        log.append(f"\n── Data Quality Metrics ──")
+        log.append("\n── Data Quality Metrics ──")
         log.append(f"  DV range (obs): {obs[dv_col].min():.3g} – {obs[dv_col].max():.3g}")
         log.append(f"  TIME range    : {df[time_col].min():.1f} – {df[time_col].max():.1f} h")
         log.append(f"  Obs/subject   : {len(obs)/n_subj:.1f} (mean)")

@@ -6,7 +6,7 @@ and verify the PKPD-specific setup logic.
 
 import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -38,11 +38,6 @@ def test_enable_langsmith_raises_without_key(monkeypatch):
 
 def test_enable_langsmith_raises_if_not_installed(monkeypatch):
     monkeypatch.setenv("LANGCHAIN_API_KEY", "ls__key")
-    with patch("builtins.__import__", side_effect=ImportError("no module")):
-        # Only trigger on langsmith import
-        original_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
-
-    import importlib
     with patch.dict("sys.modules", {"langsmith": None}):
         with pytest.raises((ImportError, TypeError)):
             enable_langsmith(api_key="ls__key")
@@ -58,7 +53,7 @@ def test_enable_langsmith_custom_endpoint(monkeypatch):
 # PKPD_SYSTEM_CONTEXT content
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.agent.pkpd_agent import PKPD_SYSTEM_CONTEXT
+from biomni.agent.pkpd_agent import PKPD_SYSTEM_CONTEXT  # noqa: E402
 
 
 def test_system_context_covers_nca():
@@ -91,7 +86,7 @@ def test_system_context_is_nonempty():
 # PKPDAgent tool module list
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.agent.pkpd_agent import PKPDAgent
+from biomni.agent.pkpd_agent import PKPDAgent  # noqa: E402
 
 
 def test_pkpd_tool_modules_list():

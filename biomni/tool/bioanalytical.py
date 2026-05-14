@@ -5,8 +5,6 @@ QC assessment, and FDA/EMA method validation.
 import os
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
-from scipy.stats import linregress, t as t_dist
 
 
 def fit_calibration_curve(
@@ -101,11 +99,11 @@ def fit_calibration_curve(
 
         log.append(f"  R²        : {r2:.6f}")
         if r2 < 0.99:
-            log.append(f"  ⚠  R² < 0.99 — review curve fit and outliers.")
+            log.append("  ⚠  R² < 0.99 — review curve fit and outliers.")
 
         # Back-calculated accuracy
-        log.append(f"\n── Back-Calculated Accuracy ──")
-        log.append(f"  FDA/EMA criterion: ≤15% bias (≤20% at LLOQ)")
+        log.append("\n── Back-Calculated Accuracy ──")
+        log.append("  FDA/EMA criterion: ≤15% bias (≤20% at LLOQ)")
         log.append(f"\n  {'Level':<8} {'Nominal':>10} {'Meas. Ratio':>14} {'Back-calc':>12} {'Bias%':>8} {'Pass'}")
         log.append(f"  {'-' * 60}")
         n_pass = 0
@@ -126,7 +124,7 @@ def fit_calibration_curve(
 
         pct_pass = n_pass / len(x) * 100
         log.append(f"\n  Standards passing: {n_pass}/{len(x)}  ({pct_pass:.0f}%)")
-        log.append(f"  FDA: ≥75% of standards must pass (minimum 6 of 8).")
+        log.append("  FDA: ≥75% of standards must pass (minimum 6 of 8).")
         if pct_pass >= 75 and n_pass >= 6:
             log.append("  ✓ Calibration curve ACCEPTABLE.")
         else:
@@ -198,7 +196,7 @@ def assess_method_validation(
     # Precision and accuracy
     for label, data in [("Intraday", intraday_data)] + ([("Interday", interday_data)] if interday_data else []):
         log.append(f"\n── {label} Precision & Accuracy ──")
-        log.append(f"  FDA/EMA: CV ≤15% (≤20% at LLOQ); Bias ≤±15% (±20% at LLOQ)")
+        log.append("  FDA/EMA: CV ≤15% (≤20% at LLOQ); Bias ≤±15% (±20% at LLOQ)")
         log.append(f"\n  {'QC Level':<12} {'Nominal':>10} {'Mean':>10} {'SD':>8} {'CV%':>8} {'Bias%':>8} {'Prec':>6} {'Acc':>6}")
         log.append(f"  {'-' * 70}")
         nominal_map = {"low": lloq * 3, "mid": (lloq * 3 + uloq * 0.75) / 2, "high": uloq * 0.75}
@@ -214,7 +212,7 @@ def assess_method_validation(
 
     # Matrix effects
     if matrix_effect_data:
-        log.append(f"\n── Matrix Effect (IS-Normalised) ──")
+        log.append("\n── Matrix Effect (IS-Normalised) ──")
         log.append("  FDA: IS-normalised ME should be ≤15% CV across 6 matrix lots.")
         post = np.array(matrix_effect_data.get("post_extraction_signal", []))
         neat = np.array(matrix_effect_data.get("neat_standard_signal", []))
@@ -225,7 +223,7 @@ def assess_method_validation(
 
     # Recovery
     if recovery_data:
-        log.append(f"\n── Extraction Recovery ──")
+        log.append("\n── Extraction Recovery ──")
         log.append("  FDA: Consistent recovery (not necessarily 100%); CV ≤15%.")
         ext = np.array(recovery_data.get("extracted", []))
         unext = np.array(recovery_data.get("unextracted", []))
@@ -235,7 +233,7 @@ def assess_method_validation(
 
     # Stability
     if stability_data:
-        log.append(f"\n── Stability ──")
+        log.append("\n── Stability ──")
         log.append("  FDA/EMA: Bias ≤±15% from nominal after stability condition.")
         for s in stability_data if isinstance(stability_data, list) else [stability_data]:
             meas = np.array(s.get("measured", []))
@@ -245,7 +243,7 @@ def assess_method_validation(
             ok = "✓" if abs(bias) <= 15 else "✗"
             log.append(f"  {ok} {cond:<35} Bias: {bias:+.1f}%")
 
-    log.append(f"\n── Selectivity & Carry-Over (Manual Assessment Required) ──")
+    log.append("\n── Selectivity & Carry-Over (Manual Assessment Required) ──")
     log.append("  Selectivity: <20% of LLOQ response in 6/6 blank matrices.")
     log.append("  Carry-over: ≤20% of LLOQ signal in blank following ULOQ injection.")
     log.append("  Dilution integrity: QC at 10× ULOQ diluted 10-fold must meet ±15% bias.")
@@ -322,7 +320,7 @@ def process_lc_ms_concentrations(
         n_aql = (df["flag"] == "AQL").sum()
         n_ok = (df["flag"] == "quantified").sum()
 
-        log.append(f"\n── Processing Summary ──")
+        log.append("\n── Processing Summary ──")
         log.append(f"  Quantified  : {n_ok} ({100*n_ok/len(df):.0f}%)")
         log.append(f"  BLQ         : {n_blq} ({100*n_blq/len(df):.0f}%)  [set to 0 or excluded]")
         log.append(f"  AQL (>ULOQ) : {n_aql} ({100*n_aql/len(df):.0f}%)  [requires re-run at dilution]")
@@ -333,7 +331,7 @@ def process_lc_ms_concentrations(
         log.append("  Ready for NCA (run_nca) or popPK input.")
 
         # BLQ handling guidance
-        log.append(f"\n── BLQ Handling Guidance ──")
+        log.append("\n── BLQ Handling Guidance ──")
         blq_pct = 100 * n_blq / len(df)
         if blq_pct < 5:
             log.append("  BLQ < 5% → exclude BLQ values (M1 method acceptable).")

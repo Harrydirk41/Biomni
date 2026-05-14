@@ -5,8 +5,6 @@ run_covariate_analysis) are tested via mock.
 """
 
 import pytest
-import tempfile
-import os
 from unittest.mock import patch
 
 
@@ -52,7 +50,7 @@ def test_all_model_types_return_string(tmp_path, model_type):
 # NONMEM output parsing (pure Python — regex)
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.poppk import parse_nonmem_output
+from biomni.tool.poppk import parse_nonmem_output  # noqa: E402
 
 MINIMAL_LST = """
  NONLINEAR MIXED EFFECTS MODEL PROGRAM (NONMEM)
@@ -106,7 +104,7 @@ def test_parse_missing_file():
 # Model comparison (pure Python)
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.poppk import compare_pk_models
+from biomni.tool.poppk import compare_pk_models  # noqa: E402
 
 
 MODEL_RESULTS = [
@@ -159,7 +157,7 @@ def test_compare_single_model():
 # R-dependent functions — tested via mock
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.poppk import run_nlmixr2_model, run_mrgsolve_simulation
+from biomni.tool.poppk import run_nlmixr2_model, run_mrgsolve_simulation  # noqa: E402
 
 
 def test_nlmixr2_calls_r(tmp_path):

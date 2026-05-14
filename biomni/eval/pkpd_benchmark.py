@@ -517,7 +517,7 @@ def run_benchmark(
     from langsmith import evaluate
 
     metadata = {"model": model_label or str(getattr(agent, "llm", "unknown"))}
-    print(f"\nRunning PKPD benchmark")
+    print("\nRunning PKPD benchmark")
     print(f"  Dataset:    {DATASET_NAME}")
     print(f"  Experiment: {experiment_prefix}")
     print(f"  Metadata:   {metadata}\n")

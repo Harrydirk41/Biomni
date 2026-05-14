@@ -1,8 +1,6 @@
 """Unit tests for biomni.tool.cdisc_io — pure pandas functions."""
 
-import pytest
 import pandas as pd
-import json
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +72,7 @@ def test_returns_string_always(tmp_path):
 # SDTM PC reader
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.cdisc_io import read_sdtm_pc
+from biomni.tool.cdisc_io import read_sdtm_pc  # noqa: E402
 
 
 def test_sdtm_pc_missing_file():
@@ -87,7 +85,7 @@ def test_sdtm_pc_missing_file():
 # NCA results → PP domain formatter
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.cdisc_io import format_nca_results_as_pp_domain
+from biomni.tool.cdisc_io import format_nca_results_as_pp_domain  # noqa: E402
 
 
 def test_pp_domain_from_nca_csv(tmp_path):

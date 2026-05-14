@@ -4,12 +4,9 @@ Covers NCA, in vitro ADME assays (microsomal stability, PPB,
 permeability, CYP inhibition), DDI risk assessment, and IVIVE.
 """
 
-import json
 import os
-import tempfile
 
 import numpy as np
-import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.stats import linregress
 
@@ -260,18 +257,18 @@ def calculate_microsomal_stability(
         # CLint,liver = CLint × MPPGL × liver weight (g) / body weight (kg)
         cl_int_liver_mL_min_kg = (cl_int_uL_per_min_per_mg * mppgl * liver_g / bw_kg) / 1000
 
-        log.append(f"\n── Kinetics ──")
+        log.append("\n── Kinetics ──")
         log.append(f"  ke (rate constant)  : {ke:.4f} min⁻¹")
         log.append(f"  In vitro t½         : {t_half_min:.1f} min")
         log.append(f"  R² (fit quality)    : {r_value**2:.4f}")
-        log.append(f"\n── Intrinsic Clearance ──")
+        log.append("\n── Intrinsic Clearance ──")
         log.append(f"  CLint (in vitro)    : {cl_int_uL_per_min_per_mg:.2f} µL/min/mg protein")
         log.append(f"  CLint (per g liver) : {cl_int_per_g_liver:.1f} µL/min/g liver")
         log.append(f"  CLint,liver (scaled): {cl_int_liver_mL_min_kg:.2f} mL/min/kg ({species})")
         log.append(f"  MPPGL used          : {mppgl} mg protein/g liver ({species})")
 
         # Classification (human thresholds from FDA/EMA guidance)
-        log.append(f"\n── Classification (Human Liver Microsomal) ──")
+        log.append("\n── Classification (Human Liver Microsomal) ──")
         if t_half_min < 30:
             cls = "HIGH clearance"
             note = "t½ < 30 min. Likely rapid first-pass; may have low oral bioavailability."
@@ -341,14 +338,14 @@ def calculate_plasma_protein_binding(
         fu = max(0.0, min(fu, 1.0))
         percent_bound = (1 - fu) * 100
 
-        log.append(f"\n── Results ──")
+        log.append("\n── Results ──")
         log.append(f"  Buffer concentration   : {buffer_conc:.4g}")
         log.append(f"  Plasma concentration   : {plasma_conc:.4g}")
         log.append(f"  fu,plasma (unbound)    : {fu:.4f}  ({fu*100:.2f}%)")
         log.append(f"  % Bound                : {percent_bound:.2f}%")
 
         # Classification
-        log.append(f"\n── Classification ──")
+        log.append("\n── Classification ──")
         if fu < 0.01:
             cls = "HIGHLY bound (fu < 1%)"
             note = "Very high PPB. Free drug fraction very low. Consider fu correction in PK/PD."
@@ -365,9 +362,9 @@ def calculate_plasma_protein_binding(
         log.append(f"  Note     : {note}")
 
         # fu correction for CLint scaling
-        log.append(f"\n── IVIVE Relevance ──")
-        log.append(f"  fu,plasma used in well-stirred model:")
-        log.append(f"  CLh = Qh × (fu × CLint) / (Qh + fu × CLint)")
+        log.append("\n── IVIVE Relevance ──")
+        log.append("  fu,plasma used in well-stirred model:")
+        log.append("  CLh = Qh × (fu × CLint) / (Qh + fu × CLint)")
         log.append(f"  For {species}, hepatic blood flow (Qh) ≈ 20.7 mL/min/kg.")
         if fu < 0.05:
             log.append("  ⚠  fu < 5% — small errors in fu measurement have large impact on predicted CLh.")
@@ -442,13 +439,13 @@ def calculate_permeability(
 
         efflux_ratio = papp_ba / papp_ab if papp_ab > 0 else float("inf")
 
-        log.append(f"\n── Permeability Results ──")
+        log.append("\n── Permeability Results ──")
         log.append(f"  Papp (A→B) : {papp_ab_scaled:.2f} × 10⁻⁶ cm/s")
         log.append(f"  Papp (B→A) : {papp_ba_scaled:.2f} × 10⁻⁶ cm/s")
         log.append(f"  Efflux ratio (B→A / A→B) : {efflux_ratio:.2f}")
 
         # BCS / FDA permeability classification
-        log.append(f"\n── Permeability Classification ──")
+        log.append("\n── Permeability Classification ──")
         if papp_ab_scaled >= 10:
             perm_cls = "HIGH permeability (BCS Class I/II)"
             perm_note = "Papp ≥ 10 × 10⁻⁶ cm/s. Good intestinal absorption expected."
@@ -462,7 +459,7 @@ def calculate_permeability(
         log.append(f"  Note     : {perm_note}")
 
         # Efflux interpretation
-        log.append(f"\n── Efflux Assessment ──")
+        log.append("\n── Efflux Assessment ──")
         if efflux_ratio >= 2.0 and assay_type.lower() == "caco2":
             log.append(f"  ⚠  Efflux ratio = {efflux_ratio:.2f} ≥ 2.0")
             log.append("     Suggests active efflux transport (likely P-gp / BCRP).")
@@ -531,26 +528,26 @@ def fit_cyp_inhibition(
         top, bottom, ic50, hill = popt
         perr = np.sqrt(np.diag(pcov))
 
-        log.append(f"\n── 4-Parameter Logistic Fit ──")
+        log.append("\n── 4-Parameter Logistic Fit ──")
         log.append(f"  IC50          : {ic50:.3f} µM  (SE: {perr[2]:.3f})")
         log.append(f"  Hill slope    : {hill:.2f}")
         log.append(f"  Top asymptote : {top:.1f}%")
         log.append(f"  Bottom asymptote: {bottom:.1f}%")
 
         # DDI risk flag (FDA 2020 DDI guidance)
-        log.append(f"\n── DDI Risk (FDA 2020 Guidance) ──")
-        log.append(f"  Basic R1 = 1 + [I]max,u / IC50  (use unbound Cmax at clinical dose)")
+        log.append("\n── DDI Risk (FDA 2020 Guidance) ──")
+        log.append("  Basic R1 = 1 + [I]max,u / IC50  (use unbound Cmax at clinical dose)")
         log.append(f"  If R1 ≥ 1.02 → clinical DDI study warranted for {cyp_enzyme}")
         if ic50 < 1.0:
-            log.append(f"  ⚠  IC50 < 1 µM — HIGH inhibition potency. Clinical DDI study likely required.")
+            log.append("  ⚠  IC50 < 1 µM — HIGH inhibition potency. Clinical DDI study likely required.")
         elif ic50 < 10.0:
-            log.append(f"  IC50 1–10 µM — MODERATE potency. Evaluate against clinical [I]u,max.")
+            log.append("  IC50 1–10 µM — MODERATE potency. Evaluate against clinical [I]u,max.")
         else:
-            log.append(f"  IC50 > 10 µM — LOW inhibition potency at likely clinical concentrations.")
+            log.append("  IC50 > 10 µM — LOW inhibition potency at likely clinical concentrations.")
 
         # TDI assessment
         if run_tdi_check and preincubation_activity is not None:
-            log.append(f"\n── Time-Dependent Inhibition (TDI) ──")
+            log.append("\n── Time-Dependent Inhibition (TDI) ──")
             y_pre = np.array(preincubation_activity, dtype=float)
             try:
                 popt_pre, _ = curve_fit(four_pl, x, y_pre, p0=p0, bounds=bounds, maxfev=10000)
@@ -564,7 +561,7 @@ def fit_cyp_inhibition(
                     log.append("     Mechanism-based inhibition (MBI) assay (kinact/KI) recommended.")
                     log.append("     Conduct FDA-recommended clinical DDI study.")
                 else:
-                    log.append(f"  Shift ratio < 1.5 — no significant TDI detected.")
+                    log.append("  Shift ratio < 1.5 — no significant TDI detected.")
             except Exception:
                 log.append("  TDI fit failed — check preincubation data quality.")
 
@@ -639,8 +636,8 @@ def predict_ddi_risk_static(
         all_ic50.update(cyp_ki)
 
     if all_ic50:
-        log.append(f"\n── CYP Inhibition DDI (R1 = 1 + [I]max,u / IC50) ──")
-        log.append(f"  Threshold: R1 ≥ 1.02 → follow-up required")
+        log.append("\n── CYP Inhibition DDI (R1 = 1 + [I]max,u / IC50) ──")
+        log.append("  Threshold: R1 ≥ 1.02 → follow-up required")
         log.append(f"  {'CYP':<12} {'IC50 (µM)':<14} {'[I]max,u/IC50':<18} {'R1':<10} {'Action'}")
         log.append(f"  {'-'*72}")
         for cyp, ic50 in sorted(all_ic50.items()):
@@ -658,19 +655,18 @@ def predict_ddi_risk_static(
     # Gut DDI (R2) — for CYP3A substrates, oral perpetrator
     if dose_mg and "CYP3A4" in (all_ic50 or {}):
         ic50_3a4 = all_ic50["CYP3A4"]
-        ka = 0.1  # min⁻¹ typical absorption rate constant
-        qen = 18.0  # mL/min enterocyte blood flow (approximation)
         # R2 = 1 + (fu_gut × dose_uM / ka / qen) ... simplified
+        # ka ≈ 0.1 min⁻¹, qen ≈ 18 mL/min/kg (enterocyte blood flow)
         mw_approx = 400  # assumed MW if unknown
         dose_uM_gut = (dose_mg / mw_approx) * 1e6 / 250  # rough gut conc
         r2 = 1 + (fu_gut * dose_uM_gut) / ic50_3a4
-        log.append(f"\n── Gut CYP3A4 DDI (R2) ──")
+        log.append("\n── Gut CYP3A4 DDI (R2) ──")
         log.append(f"  R2 = {r2:.2f}  (threshold ≥ 11 warrants further study)")
         if r2 >= 11:
             log.append("  ⚠  R2 ≥ 11 — gut CYP3A4 inhibition is clinically relevant.")
 
     # P-gp assessment
-    log.append(f"\n── P-glycoprotein (P-gp) Assessment ──")
+    log.append("\n── P-glycoprotein (P-gp) Assessment ──")
     log.append(f"  Substrate   : {'Yes' if is_p_gp_substrate else 'No/Unknown'}")
     log.append(f"  Inhibitor   : {'Yes' if is_p_gp_inhibitor else 'No/Unknown'}")
     if is_p_gp_inhibitor and p_gp_ic50_uM:
@@ -679,7 +675,7 @@ def predict_ddi_risk_static(
         if r_pgp >= 1.1:
             log.append("  ⚠  P-gp inhibition may affect absorption/CNS penetration of co-medications.")
 
-    log.append(f"\n── Summary ──")
+    log.append("\n── Summary ──")
     log.append("  Review R1 values against each CYP above.")
     log.append("  Consult FDA 2020 'In Vitro Drug Interaction Studies' guidance for next steps.")
     log.append("  EMA 2012 DDI guideline also applies for EU submissions.")
@@ -751,7 +747,7 @@ def ivive_clearance(
     # Correct for fu (unbound in plasma and microsomes)
     cl_int_u = cl_int_scaled * (fu_plasma / fu_microsomal)
 
-    log.append(f"\n── Scaling ──")
+    log.append("\n── Scaling ──")
     log.append(f"  CLint (in vitro)      : {cl_int_uL_per_min_per_mg:.2f} µL/min/mg")
     log.append(f"  MPPGL                 : {mppgl} mg/g liver ({species})")
     log.append(f"  Liver weight          : {liver_g:.1f} g ({species}, {bw} kg)")
@@ -781,20 +777,20 @@ def ivive_clearance(
     log.append(f"  Extraction ratio (Eh) : {eh:.3f}")
     log.append(f"  Fh (oral, hepatic)    : {fh:.3f}  ({fh*100:.1f}%)")
 
-    log.append(f"\n── Classification ──")
+    log.append("\n── Classification ──")
     if eh > 0.7:
-        log.append(f"  HIGH extraction ratio (Eh > 0.7)")
-        log.append(f"  Sensitive to hepatic blood flow changes (heart failure, food effect).")
-        log.append(f"  Oral bioavailability likely < 30% from first-pass alone.")
+        log.append("  HIGH extraction ratio (Eh > 0.7)")
+        log.append("  Sensitive to hepatic blood flow changes (heart failure, food effect).")
+        log.append("  Oral bioavailability likely < 30% from first-pass alone.")
     elif eh > 0.3:
-        log.append(f"  INTERMEDIATE extraction ratio (0.3–0.7)")
-        log.append(f"  Both CLint and blood flow contribute to CLh.")
+        log.append("  INTERMEDIATE extraction ratio (0.3–0.7)")
+        log.append("  Both CLint and blood flow contribute to CLh.")
     else:
-        log.append(f"  LOW extraction ratio (Eh < 0.3)")
-        log.append(f"  CLh sensitive to changes in CLint (enzyme inhibition/induction).")
-        log.append(f"  PPB changes can affect CLh (for restrictively cleared drugs).")
+        log.append("  LOW extraction ratio (Eh < 0.3)")
+        log.append("  CLh sensitive to changes in CLint (enzyme inhibition/induction).")
+        log.append("  PPB changes can affect CLh (for restrictively cleared drugs).")
 
-    log.append(f"\n── Caveats ──")
+    log.append("\n── Caveats ──")
     log.append("  IVIVE predictions typically have 2–3-fold uncertainty.")
     log.append("  Verify with in vivo IV PK study in preclinical species.")
     log.append("  Does not account for renal, biliary, or gut clearance.")
@@ -853,7 +849,7 @@ def summarise_adme_profile(
     positives = []
 
     # Metabolic stability
-    log.append(f"\n1. METABOLIC STABILITY")
+    log.append("\n1. METABOLIC STABILITY")
     if microsomal_t_half_min is not None:
         if microsomal_t_half_min < 30:
             log.append(f"   HLM t½: {microsomal_t_half_min:.0f} min  →  HIGH clearance  ⚠")
@@ -867,7 +863,7 @@ def summarise_adme_profile(
         log.append("   Not measured")
 
     # Plasma protein binding
-    log.append(f"\n2. PLASMA PROTEIN BINDING")
+    log.append("\n2. PLASMA PROTEIN BINDING")
     if fu_plasma is not None:
         log.append(f"   fu,plasma: {fu_plasma:.3f}  ({(1-fu_plasma)*100:.1f}% bound)")
         if fu_plasma < 0.01:
@@ -876,7 +872,7 @@ def summarise_adme_profile(
         log.append("   Not measured")
 
     # Permeability
-    log.append(f"\n3. PERMEABILITY")
+    log.append("\n3. PERMEABILITY")
     if papp_ab_1e6_cm_s is not None:
         if papp_ab_1e6_cm_s >= 10:
             log.append(f"   Papp A→B: {papp_ab_1e6_cm_s:.1f} × 10⁻⁶ cm/s  →  HIGH  ✓")
@@ -893,7 +889,7 @@ def summarise_adme_profile(
         log.append("   Not measured")
 
     # CYP inhibition
-    log.append(f"\n4. CYP INHIBITION RISK")
+    log.append("\n4. CYP INHIBITION RISK")
     if cyp_ic50_dict:
         for cyp, ic50 in sorted(cyp_ic50_dict.items()):
             risk = "⚠ HIGH" if ic50 < 1 else ("MODERATE" if ic50 < 10 else "low")
@@ -911,19 +907,19 @@ def summarise_adme_profile(
         log.append(f"   Predicted Fh  : {predicted_fh:.2f}  ({predicted_fh*100:.0f}% hepatic availability)")
 
     # Overall flags
-    log.append(f"\n── Issues Flagged ──")
+    log.append("\n── Issues Flagged ──")
     if flags:
         for f in flags:
             log.append(f"  ⚠  {f}")
     else:
         log.append("  No major issues flagged.")
 
-    log.append(f"\n── Strengths ──")
+    log.append("\n── Strengths ──")
     if positives:
         for p in positives:
             log.append(f"  ✓  {p}")
 
-    log.append(f"\n── Suggested Next Experiments ──")
+    log.append("\n── Suggested Next Experiments ──")
     if any("clearance" in f.lower() for f in flags):
         log.append("  • Hepatocyte stability assay (more predictive CLh than microsomes)")
         log.append("  • Metabolite ID to identify major metabolic soft spots")

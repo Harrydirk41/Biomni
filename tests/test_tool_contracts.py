@@ -40,7 +40,7 @@ def pkpd_module(request):
 def test_all_public_functions_return_str(pkpd_module):
     for name, fn in get_public_functions(pkpd_module):
         hints = fn.__annotations__
-        assert hints.get("return") == str, (
+        assert hints.get("return") is str, (
             f"{pkpd_module.__name__}.{name} must annotate return type as str "
             f"(Biomni tool convention). Got: {hints.get('return')}"
         )

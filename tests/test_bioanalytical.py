@@ -2,7 +2,6 @@
 
 import pytest
 import pandas as pd
-import numpy as np
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -59,7 +58,7 @@ def test_calibration_curve_empty_input():
 # Method validation
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.bioanalytical import assess_method_validation
+from biomni.tool.bioanalytical import assess_method_validation  # noqa: E402
 
 INTRADAY = {
     "low":  [3.1, 2.9, 3.0, 3.2, 2.8],
@@ -110,7 +109,7 @@ def test_validation_reports_accuracy():
 # LC-MS concentration processing
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.bioanalytical import process_lc_ms_concentrations
+from biomni.tool.bioanalytical import process_lc_ms_concentrations  # noqa: E402
 
 
 def test_process_lc_ms_returns_string(tmp_path):

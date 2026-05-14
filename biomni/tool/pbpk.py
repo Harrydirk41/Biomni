@@ -9,9 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from scipy.integrate import solve_ivp
-from scipy.optimize import minimize
 
-from biomni.utils import run_r_code
 
 
 def run_minimal_pbpk_model(
@@ -93,16 +91,13 @@ def run_minimal_pbpk_model(
     CLh_mL_min_kg = Ql_mL_min_kg * (fup * CL_int_mL_min_kg) / (Ql_mL_min_kg + fup * CL_int_mL_min_kg)
     CLh_L_h_kg = CLh_mL_min_kg * 60 / 1000
 
-    dose_mg = dose_mg_kg * BW
-    dose_nmol = dose_mg * 1e6 / 400  # approximate MW=400
-
     log.append(f"\n── Physiological Parameters ({species}) ──")
     log.append(f"  Body weight        : {BW} kg")
     log.append(f"  Blood volume       : {Vb:.3f} L  ({Vb_L*1000:.1f} mL/kg)")
     log.append(f"  Liver volume       : {Vl:.3f} L  ({Vl_L*1000:.1f} mL/kg)")
     log.append(f"  Peripheral volume  : {Vt:.2f} L  ({Vt_L*1000:.0f} mL/kg)")
     log.append(f"  Hepatic blood flow : {Ql:.1f} mL/min  ({Ql_mL_min_kg:.1f} mL/min/kg)")
-    log.append(f"\n── Compound Properties ──")
+    log.append("\n── Compound Properties ──")
     log.append(f"  fu,plasma          : {fup:.4f}")
     log.append(f"  Kp (blood:tissue)  : {Kp:.2f}  (estimated from logP={logP})")
     log.append(f"  CLint (microsomal) : {cl_int_uL_per_min_per_mg:.1f} µL/min/mg")
@@ -111,7 +106,6 @@ def run_minimal_pbpk_model(
 
     # ODE simulation
     t_h = np.linspace(0, simulation_duration_h, int(simulation_duration_h * 12) + 1)
-    t_min = t_h * 60
     Ql_h = Ql_mL_min_kg * 60 / 1000  # L/h/kg
     Qt_h = Ql_h  # simplified: total perfusion ≈ hepatic for 3-cmt
 
@@ -203,8 +197,6 @@ def predict_human_pk_from_preclinical(
     log.append(f"Species tested : {', '.join(d['species'] for d in preclinical_data)}")
 
     human_BW = 70.0
-    human_brain_weight = 1.53  # kg (for MLP correction)
-
     bw_list = np.array([d["BW_kg"] for d in preclinical_data])
     cl_list = np.array([d["CL_mL_min_kg"] for d in preclinical_data])
     vd_list = np.array([d.get("Vd_L_kg", 1.0) for d in preclinical_data])
@@ -213,7 +205,7 @@ def predict_human_pk_from_preclinical(
     cl_total = cl_list * bw_list
     vd_total = vd_list * bw_list
 
-    log.append(f"\n── Preclinical Data ──")
+    log.append("\n── Preclinical Data ──")
     log.append(f"  {'Species':<12} {'BW (kg)':<12} {'CL (mL/min/kg)':<18} {'CL total (mL/min)':<20} {'Vd (L/kg)':<12}")
     log.append(f"  {'-' * 74}")
     for d, cl_t, vd_t in zip(preclinical_data, cl_total, vd_total):
@@ -234,31 +226,31 @@ def predict_human_pk_from_preclinical(
         vd_human_pred = a_vd * human_BW ** b_vd
         vd_human_per_kg = vd_human_pred / human_BW
 
-        log.append(f"\n── Allometric Scaling: Y = a × BW^b ──")
+        log.append("\n── Allometric Scaling: Y = a × BW^b ──")
         log.append(f"  CL: a = {a_cl:.4g}, b = {b_cl:.3f}")
         log.append(f"  Vd: a = {a_vd:.4g}, b = {b_vd:.3f}")
 
         # Rule of exponents interpretation
         log.append(f"\n── Rule of Exponents (CL exponent = {b_cl:.2f}) ──")
         if b_cl < 0.7:
-            log.append(f"  b < 0.7 → Use simple allometry directly.")
+            log.append("  b < 0.7 → Use simple allometry directly.")
         elif b_cl < 1.0:
-            log.append(f"  0.7 ≤ b < 1.0 → Use allometry with MLP (Maximum Life Span Potential) correction.")
-            log.append(f"  MLP-corrected prediction recommended for final estimate.")
+            log.append("  0.7 ≤ b < 1.0 → Use allometry with MLP (Maximum Life Span Potential) correction.")
+            log.append("  MLP-corrected prediction recommended for final estimate.")
         else:
-            log.append(f"  b ≥ 1.0 → Use allometry with brain weight correction (Mahmood).")
+            log.append("  b ≥ 1.0 → Use allometry with brain weight correction (Mahmood).")
 
-        log.append(f"\n── Predicted Human PK ──")
+        log.append("\n── Predicted Human PK ──")
         log.append(f"  Predicted CL (human) : {cl_human_per_kg:.2f} mL/min/kg  ({cl_human_pred:.0f} mL/min, {human_BW} kg)")
         log.append(f"  Predicted Vd (human) : {vd_human_per_kg:.2f} L/kg  ({vd_human_pred:.0f} L, {human_BW} kg)")
         t_half_pred = np.log(2) * vd_human_pred / (cl_human_pred / 1000 * 60)
         log.append(f"  Predicted t½ (human) : {t_half_pred:.1f} h")
 
         # Typical prediction uncertainty
-        log.append(f"\n── Uncertainty ──")
-        log.append(f"  Allometric scaling typically has 2–3-fold error for CL.")
-        log.append(f"  In vitro-in vivo correction (IVIVE) via fu reduces error.")
-        log.append(f"  Recommend validating with at least 3 species (rat, dog, monkey).")
+        log.append("\n── Uncertainty ──")
+        log.append("  Allometric scaling typically has 2–3-fold error for CL.")
+        log.append("  In vitro-in vivo correction (IVIVE) via fu reduces error.")
+        log.append("  Recommend validating with at least 3 species (rat, dog, monkey).")
 
     except Exception as exc:
         log.append(f"\nScaling calculation error: {exc}")
@@ -329,7 +321,7 @@ def calculate_allometric_dose(
         human_dose_mg = hed_mg_kg * bw_human
         log.append(f"\n  HED (BSA-based) human dose : {hed_mg_kg:.4f} mg/kg  ({human_dose_mg:.1f} mg)")
         log.append(f"  Km factors used: {preclinical_species}={km_animal}, {target_species}={km_human}")
-        log.append(f"  (FDA HED method: Guidance for Industry, 2005)")
+        log.append("  (FDA HED method: Guidance for Industry, 2005)")
 
     elif conversion_basis == "AUC":
         if preclinical_cl_mL_min_kg and human_cl_mL_min_kg:
@@ -344,7 +336,7 @@ def calculate_allometric_dose(
         else:
             log.append("\n  AUC-based conversion requires both preclinical_cl and human_cl.")
 
-    log.append(f"\n── Safety Note ──")
+    log.append("\n── Safety Note ──")
     log.append("  Always apply a safety margin (typically 1/10 to 1/6 of NOAEL HED for FIH dose).")
     log.append("  Consult FDA 'Estimating Maximum Safe Starting Dose in Initial Clinical Trials'.")
     log.append("  MRSD (Maximum Recommended Starting Dose) = HED / Safety Factor")

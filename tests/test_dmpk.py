@@ -4,7 +4,6 @@ Functions that call run_r_code() (run_nca) are tested via mock.
 All other functions are deterministic and tested against exact values.
 """
 
-import pytest
 from unittest.mock import patch
 
 
@@ -59,7 +58,7 @@ def test_clint_insufficient_points():
 # Plasma protein binding
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.dmpk import calculate_plasma_protein_binding
+from biomni.tool.dmpk import calculate_plasma_protein_binding  # noqa: E402
 
 
 def test_ppb_fu_calculation():
@@ -97,7 +96,7 @@ def test_ppb_returns_string():
 # Permeability
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.dmpk import calculate_permeability
+from biomni.tool.dmpk import calculate_permeability  # noqa: E402
 
 
 def test_permeability_high_papp():
@@ -133,7 +132,7 @@ def test_permeability_efflux_ratio_pgp():
 # CYP inhibition
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.dmpk import fit_cyp_inhibition
+from biomni.tool.dmpk import fit_cyp_inhibition  # noqa: E402
 
 
 def test_cyp_ic50_fitted():
@@ -170,7 +169,7 @@ def test_cyp_low_risk_classification():
 # DDI risk static model
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.dmpk import predict_ddi_risk_static
+from biomni.tool.dmpk import predict_ddi_risk_static  # noqa: E402
 
 
 def test_ddi_r1_high_value():
@@ -211,7 +210,7 @@ def test_ddi_returns_r1_for_each_cyp():
 # IVIVE clearance
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.dmpk import ivive_clearance
+from biomni.tool.dmpk import ivive_clearance  # noqa: E402
 
 
 def test_ivive_returns_string():
@@ -249,7 +248,7 @@ def test_ivive_all_models():
 # run_nca (R-dependent — test via mock)
 # ─────────────────────────────────────────────────────────────────────────────
 
-from biomni.tool.dmpk import run_nca
+from biomni.tool.dmpk import run_nca  # noqa: E402
 
 
 def test_run_nca_calls_r_code():
