@@ -102,13 +102,11 @@ from biomni.tool.dmpk import calculate_permeability  # noqa: E402
 def test_permeability_high_papp():
     # Papp A→B high → high permeability
     result = calculate_permeability(
-        apical_to_basolateral_conc=[0.0, 8.5],
-        basolateral_to_apical_conc=[0.0, 1.2],
+        apical_to_basolateral_conc=8.5,
+        basolateral_to_apical_conc=1.2,
         donor_conc_initial=10.0,
-        incubation_time_h=2.0,
-        insert_area_cm2=0.33,
-        volume_donor_mL=0.1,
-        volume_receiver_mL=0.6,
+        membrane_area_cm2=0.33,
+        time_h=2.0,
     )
     assert isinstance(result, str)
     assert "Papp" in result
@@ -117,13 +115,11 @@ def test_permeability_high_papp():
 def test_permeability_efflux_ratio_pgp():
     # B→A >> A→B → efflux ratio ≥ 2 → P-gp flag
     result = calculate_permeability(
-        apical_to_basolateral_conc=[0.0, 0.5],
-        basolateral_to_apical_conc=[0.0, 5.0],
+        apical_to_basolateral_conc=0.5,
+        basolateral_to_apical_conc=5.0,
         donor_conc_initial=10.0,
-        incubation_time_h=2.0,
-        insert_area_cm2=0.33,
-        volume_donor_mL=0.1,
-        volume_receiver_mL=0.6,
+        membrane_area_cm2=0.33,
+        time_h=2.0,
     )
     assert "efflux" in result.lower() or "P-gp" in result or "ratio" in result.lower()
 
