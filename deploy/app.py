@@ -63,7 +63,7 @@ _CHAT_HTML = """<!DOCTYPE html>
   <div id="file-preview"></div>
   <div id="input-row">
     <button class="icon-btn" onclick="document.getElementById('file-input').click()" title="Attach files">📎</button>
-    <input type="file" id="file-input" multiple accept=".csv,.lst,.ctl,.mod,.ext,.cov,.cor,.txt,.xlsx,.xls,.json" onchange="onFiles(this)">
+    <input type="file" id="file-input" multiple accept=".csv,.lst,.ctl,.mod,.ext,.cov,.cor,.txt,.xlsx,.xls,.json,.pdf" onchange="onFiles(this)">
     <textarea id="prompt" placeholder="Ask a PKPD question, or attach a file and describe what you need..." rows="1" oninput="autoResize(this)"></textarea>
     <button id="send" onclick="send()">Send</button>
   </div>
@@ -202,6 +202,23 @@ def _parse_file(filename: str, content: bytes) -> str:
             return "\n".join(parts)
         except Exception as e:
             return f"File: {filename}\n[Could not parse Excel: {e}]"
+
+    elif ext == "pdf":
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(content))
+            pages = []
+            for i, page in enumerate(reader.pages):
+                text = page.extract_text() or ""
+                pages.append(f"[Page {i+1}]\n{text.strip()}")
+            full_text = "\n\n".join(pages)
+            if len(full_text) > 12000:
+                full_text = full_text[:12000] + f"\n\n... [truncated, {len(reader.pages)} pages total]"
+            return f"File: {filename} ({len(reader.pages)} pages)\n\n{full_text}"
+        except ImportError:
+            return f"File: {filename}\n[PDF parsing requires pypdf. Install with: pip install pypdf]"
+        except Exception as e:
+            return f"File: {filename}\n[Could not parse PDF: {e}]"
 
     elif ext in ("lst", "ctl", "mod", "ext", "cov", "cor", "txt", "json"):
         text = content.decode("utf-8", errors="replace")

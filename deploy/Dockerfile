@@ -36,8 +36,8 @@ COPY biomni/           ./biomni/
 COPY pyproject.toml    ./
 COPY MANIFEST.in       ./
 RUN /opt/conda/envs/biomni_e1/bin/pip install --no-cache-dir -e . --no-deps \
- && /opt/conda/envs/biomni_e1/bin/pip install --no-cache-dir boto3 \
- && /opt/conda/envs/biomni_e1/bin/python -c "import boto3; from biomni.llm import _BedrockChat; print('Bedrock OK')"
+ && /opt/conda/envs/biomni_e1/bin/pip install --no-cache-dir boto3 pypdf \
+ && /opt/conda/envs/biomni_e1/bin/python -c "import boto3, pypdf; from biomni.llm import _BedrockChat; print('Bedrock OK')"
 
 # Copy deployment helpers
 COPY deploy/app.py            ./app.py
