@@ -86,10 +86,6 @@ async def launch_gradio():
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
         None,
-        lambda: _agent.launch_gradio_demo(
-            server_name="0.0.0.0",
-            server_port=7860,
-            share=False,
-        ),
+        lambda: _agent.launch_gradio_demo(server_name="0.0.0.0", share=False),
     )
     return {"status": "gradio started", "port": 7860}
