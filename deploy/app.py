@@ -17,7 +17,7 @@ _agent: A1 = None
 
 _MEMORY_ENABLED = os.getenv("BIOMNI_MEMORY", "true").lower() == "true"
 
-_CHAT_HTML = """<!DOCTYPE html>
+_CHAT_HTML_UNUSED = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -381,7 +381,9 @@ class PromptResponse(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def chat_ui():
-    return HTMLResponse(content=_CHAT_HTML)
+    html_path = os.path.join(os.path.dirname(__file__), "chat.html")
+    with open(html_path) as f:
+        return HTMLResponse(content=f.read())
 
 
 @app.get("/health")

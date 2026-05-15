@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biomni PKPD Agent</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; height: 100vh; display: flex; align-items: center; justify-content: center; }
+  #app { width: 100%; max-width: 1100px; height: 92vh; display: flex; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.12); overflow: hidden; background: white; }
+  #sidebar { width: 240px; min-width: 240px; background: #1a1a2e; display: flex; flex-direction: column; color: white; }
+  #sidebar header { padding: 16px; font-size: 15px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  #sidebar header small { display: block; font-size: 11px; font-weight: 400; opacity: 0.6; margin-top: 2px; }
+  #new-chat { margin: 10px; padding: 9px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; font-size: 13px; text-align: left; }
+  #new-chat:hover { background: rgba(255,255,255,0.2); }
+  #sessions { flex: 1; overflow-y: auto; padding: 6px; }
+  .sess-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; color: rgba(255,255,255,0.75); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sess-item:hover { background: rgba(255,255,255,0.1); }
+  .sess-item.active { background: rgba(255,255,255,0.18); color: white; }
+  #memory-badge { margin: 8px 10px; padding: 6px 10px; background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.3); border-radius: 6px; font-size: 11px; color: rgba(255,220,100,0.9); }
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 88%; padding: 11px 15px; border-radius: 12px; line-height: 1.55; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .user { align-self: flex-end; background: #1a1a2e; color: white; border-bottom-right-radius: 4px; }
+  .agent { align-self: flex-start; background: #f0f2f5; color: #1a1a2e; border-bottom-left-radius: 4px; }
+  .thinking { opacity: 0.45; font-style: italic; }
+  .file-badge { display: inline-block; background: rgba(255,255,255,0.2); border-radius: 4px; padding: 2px 7px; font-size: 12px; margin-right: 4px; margin-bottom: 4px; }
+  #file-preview { padding: 6px 16px; background: #f8f8ff; border-top: 1px solid #eee; display: none; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: #555; }
+  .fp-chip { background: #e8eaf6; border-radius: 20px; padding: 3px 10px; display: flex; align-items: center; gap: 5px; }
+  .fp-chip button { background: none; border: none; cursor: pointer; color: #888; font-size: 14px; padding: 0; line-height: 1; }
+  #input-row { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; align-items: flex-end; }
+  #prompt { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; resize: none; min-height: 44px; max-height: 120px; outline: none; font-family: inherit; }
+  #prompt:focus { border-color: #1a1a2e; }
+  .icon-btn { background: none; border: 1px solid #ddd; border-radius: 8px; padding: 9px 12px; cursor: pointer; font-size: 16px; color: #555; display: flex; align-items: center; }
+  .icon-btn:hover { background: #f5f5f5; }
+  #send-btn { padding: 10px 20px; background: #1a1a2e; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; height: 44px; }
+  #send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  #file-input { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <header>Biomni PKPD<small>Pharmacokinetics AI Agent</small></header>
+    <button id="new-chat">+ New Conversation</button>
+    <div id="memory-badge">Long-term memory active</div>
+    <div id="sessions"></div>
+  </div>
+  <div id="main">
+    <div id="messages">
+      <div class="msg agent">Hello! I am the Biomni PKPD Agent. I remember facts from previous sessions and maintain context within our conversation.<br><br>Ask me anything about pharmacokinetics, NCA, PopPK, DMPK, or CDISC — or attach a file (CSV, NONMEM, Excel, PDF).</div>
+    </div>
+    <div id="file-preview"></div>
+    <div id="input-row">
+      <button class="icon-btn" id="attach-btn" title="Attach files">&#128206;</button>
+      <input type="file" id="file-input" multiple accept=".csv,.lst,.ctl,.mod,.ext,.cov,.cor,.txt,.xlsx,.xls,.json,.pdf">
+      <textarea id="prompt" placeholder="Ask a PKPD question..." rows="1"></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+</div>
+<script>
+  var sessionId = null;
+  var attachedFiles = [];
+
+  var messagesEl = document.getElementById('messages');
+  var promptEl = document.getElementById('prompt');
+  var sendBtn = document.getElementById('send-btn');
+  var filePreview = document.getElementById('file-preview');
+  var fileInput = document.getElementById('file-input');
+
+  document.getElementById('new-chat').addEventListener('click', newChat);
+  document.getElementById('attach-btn').addEventListener('click', function() { fileInput.click(); });
+  fileInput.addEventListener('change', onFiles);
+  sendBtn.addEventListener('click', sendMessage);
+  promptEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  promptEl.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  window.addEventListener('load', function() {
+    sessionId = localStorage.getItem('biomni_session');
+    if (sessionId) {
+      loadSession(sessionId).catch(function() { newChat(); });
+    } else {
+      newChat();
+    }
+    loadSessionList().catch(function() {});
+  });
+
+  function newChat() {
+    return fetch('/sessions', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        sessionId = d.session_id || ('local-' + Date.now());
+        localStorage.setItem('biomni_session', sessionId);
+        messagesEl.innerHTML = '<div class="msg agent">Hello! I am the Biomni PKPD Agent. Ask me anything about pharmacokinetics, NCA, PopPK, DMPK, or attach a file.</div>';
+        return loadSessionList().catch(function() {});
+      })
+      .catch(function() {
+        sessionId = 'local-' + Date.now();
+        localStorage.setItem('biomni_session', sessionId);
+      });
+  }
+
+  function loadSession(id) {
+    return fetch('/sessions/' + id)
+      .then(function(r) {
+        if (!r.ok) throw new Error('not found');
+        return r.json();
+      })
+      .then(function(d) {
+        var msgs = d.messages || [];
+        if (msgs.length === 0) return;
+        messagesEl.innerHTML = '';
+        msgs.forEach(function(msg) {
+          appendMessage(msg.role === 'user' ? 'user' : 'agent', msg.content);
+        });
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
+  }
+
+  function switchSession(id) {
+    sessionId = id;
+    localStorage.setItem('biomni_session', sessionId);
+    loadSession(id).catch(function() {});
+    loadSessionList().catch(function() {});
+  }
+
+  function loadSessionList() {
+    return fetch('/sessions')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var container = document.getElementById('sessions');
+        container.innerHTML = data.map(function(s) {
+          var active = s.session_id === sessionId ? ' active' : '';
+          var title = escHtml(s.title || 'Conversation');
+          return '<div class="sess-item' + active + '" data-id="' + escHtml(s.session_id) + '" title="' + title + '">' + title + '</div>';
+        }).join('');
+        container.querySelectorAll('.sess-item').forEach(function(el) {
+          el.addEventListener('click', function() { switchSession(this.dataset.id); });
+        });
+      });
+  }
+
+  function onFiles() {
+    for (var i = 0; i < fileInput.files.length; i++) {
+      attachedFiles.push(fileInput.files[i]);
+    }
+    fileInput.value = '';
+    renderFilePreview();
+  }
+
+  function renderFilePreview() {
+    if (!attachedFiles.length) { filePreview.style.display = 'none'; return; }
+    filePreview.style.display = 'flex';
+    filePreview.innerHTML = '&#128206; ' + attachedFiles.map(function(f, i) {
+      return '<span class="fp-chip">' + escHtml(f.name) + ' <button data-i="' + i + '">x</button></span>';
+    }).join('');
+    filePreview.querySelectorAll('button').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        attachedFiles.splice(parseInt(this.dataset.i), 1);
+        renderFilePreview();
+      });
+    });
+  }
+
+  function sendMessage() {
+    var text = promptEl.value.trim();
+    if (!text && !attachedFiles.length) return;
+    sendBtn.disabled = true;
+
+    var userHtml = '';
+    if (attachedFiles.length) {
+      userHtml += attachedFiles.map(function(f) {
+        return '<span class="file-badge">' + escHtml(f.name) + '</span>';
+      }).join('') + '<br>';
+    }
+    if (text) userHtml += escHtml(text);
+    appendMessage('user', null, userHtml);
+
+    var files = attachedFiles.slice();
+    attachedFiles = [];
+    renderFilePreview();
+    promptEl.value = '';
+    promptEl.style.height = 'auto';
+
+    var thinking = appendMessage('agent', 'Analyzing' + (files.length ? ' files' : '') + '...', null, true);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    var promise;
+    if (files.length > 0) {
+      var fd = new FormData();
+      fd.append('prompt', text || 'Please analyze the attached file(s) and provide PKPD insights.');
+      fd.append('session_id', sessionId || '');
+      files.forEach(function(f) { fd.append('files', f); });
+      promise = fetch('/upload', { method: 'POST', body: fd }).then(function(r) { return r.json(); });
+    } else {
+      promise = fetch('/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: text, session_id: sessionId })
+      }).then(function(r) { return r.json(); });
+    }
+
+    promise.then(function(data) {
+      thinking.className = 'msg agent';
+      thinking.textContent = extractSolution(data.result || data.detail || 'No response');
+    }).catch(function(e) {
+      thinking.className = 'msg agent';
+      thinking.textContent = 'Error: ' + e.message;
+    }).finally(function() {
+      sendBtn.disabled = false;
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      loadSessionList().catch(function() {});
+      promptEl.focus();
+    });
+  }
+
+  function appendMessage(role, text, html, isThinking) {
+    var el = document.createElement('div');
+    el.className = 'msg ' + role + (isThinking ? ' thinking' : '');
+    if (html) el.innerHTML = html;
+    else el.textContent = text || '';
+    messagesEl.appendChild(el);
+    return el;
+  }
+
+  function extractSolution(raw) {
+    var m = raw.match(/<solution>([\s\S]*?)<\/solution>/);
+    if (m) return m[1].trim();
+    return raw.trim();
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>

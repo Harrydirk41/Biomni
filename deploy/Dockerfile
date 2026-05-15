@@ -41,6 +41,8 @@ RUN /opt/conda/envs/biomni_e1/bin/pip install --no-cache-dir -e . --no-deps \
 
 # Copy deployment helpers
 COPY deploy/app.py            ./app.py
+COPY deploy/memory.py         ./memory.py
+COPY deploy/chat.html         ./chat.html
 COPY deploy/lambda_handler.py ./lambda_handler.py
 
 EXPOSE 8000 7860
