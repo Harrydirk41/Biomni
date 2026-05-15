@@ -1,10 +1,93 @@
+import json
 import os
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Literal, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
 if TYPE_CHECKING:
     from biomni.config import BiomniConfig
+
+
+class _BedrockChat(BaseChatModel):
+    """Minimal boto3-based Bedrock chat model — no langchain-aws dependency."""
+
+    model_id: str
+    temperature: float = 0.7
+    stop_sequences: list[str] = []
+    region_name: str = "us-east-1"
+
+    @property
+    def _llm_type(self) -> str:
+        return "bedrock-chat"
+
+    @property
+    def _identifying_params(self) -> dict[str, Any]:
+        return {"model_id": self.model_id, "temperature": self.temperature}
+
+    def _messages_to_bedrock(self, messages: list[BaseMessage]) -> tuple[str, list[dict]]:
+        system = ""
+        bedrock_msgs = []
+        for msg in messages:
+            if msg.type == "system":
+                system = str(msg.content)
+            elif msg.type == "human":
+                bedrock_msgs.append({"role": "user", "content": str(msg.content)})
+            elif msg.type == "ai":
+                bedrock_msgs.append({"role": "assistant", "content": str(msg.content)})
+        return system, bedrock_msgs
+
+    def _generate(self, messages: list[BaseMessage], stop: list[str] | None = None, run_manager: Any = None, **kwargs: Any) -> ChatResult:
+        import boto3
+        client = boto3.client("bedrock-runtime", region_name=self.region_name)
+        system, bedrock_msgs = self._messages_to_bedrock(messages)
+        body: dict[str, Any] = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 8192,
+            "messages": bedrock_msgs,
+            "temperature": self.temperature,
+        }
+        if system:
+            body["system"] = system
+        effective_stop = stop or self.stop_sequences
+        if effective_stop:
+            body["stop_sequences"] = effective_stop
+        response = client.invoke_model(modelId=self.model_id, body=json.dumps(body))
+        rb = json.loads(response["body"].read())
+        text = rb["content"][0]["text"]
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text))])
+
+    def _stream(self, messages: list[BaseMessage], stop: list[str] | None = None, run_manager: Any = None, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
+        import boto3
+        client = boto3.client("bedrock-runtime", region_name=self.region_name)
+        system, bedrock_msgs = self._messages_to_bedrock(messages)
+        body: dict[str, Any] = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 8192,
+            "messages": bedrock_msgs,
+            "temperature": self.temperature,
+        }
+        if system:
+            body["system"] = system
+        effective_stop = stop or self.stop_sequences
+        if effective_stop:
+            body["stop_sequences"] = effective_stop
+        response = client.invoke_model_with_response_stream(modelId=self.model_id, body=json.dumps(body))
+        for event in response["body"]:
+            chunk = json.loads(event["chunk"]["bytes"])
+            if chunk.get("type") == "content_block_delta":
+                delta = chunk["delta"].get("text", "")
+                yield ChatGenerationChunk(message=AIMessageChunk(content=delta))
+
+
+def _make_bedrock_llm(model: str, temperature: float, stop_sequences: list[str] | None) -> "_BedrockChat":
+    return _BedrockChat(
+        model_id=model,
+        temperature=temperature,
+        stop_sequences=stop_sequences or [],
+        region_name=os.getenv("AWS_REGION", "us-east-1"),
+    )
 
 SourceType = Literal["OpenAI", "AzureOpenAI", "Anthropic", "Ollama", "Gemini", "Bedrock", "Groq", "Custom"]
 ALLOWED_SOURCES: set[str] = set(SourceType.__args__)
@@ -237,18 +320,7 @@ def get_llm(
         )
 
     elif source == "Bedrock":
-        try:
-            from langchain_aws import ChatBedrock
-        except ImportError:
-            raise ImportError(  # noqa: B904
-                "langchain-aws package is required for Bedrock models. Install with: pip install langchain-aws"
-            )
-        return ChatBedrock(
-            model=model,
-            temperature=temperature,
-            stop_sequences=stop_sequences,
-            region_name=os.getenv("AWS_REGION", "us-east-1"),
-        )
+        return _make_bedrock_llm(model, temperature, stop_sequences)
 
     elif source == "Custom":
         try:
