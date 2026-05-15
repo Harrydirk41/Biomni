@@ -212,8 +212,8 @@ def _parse_file(filename: str, content: bytes) -> str:
                 text = page.extract_text() or ""
                 pages.append(f"[Page {i+1}]\n{text.strip()}")
             full_text = "\n\n".join(pages)
-            if len(full_text) > 12000:
-                full_text = full_text[:12000] + f"\n\n... [truncated, {len(reader.pages)} pages total]"
+            if len(full_text) > 80000:
+                full_text = full_text[:80000] + f"\n\n... [truncated at 80,000 chars — {len(reader.pages)} pages total]"
             return f"File: {filename} ({len(reader.pages)} pages)\n\n{full_text}"
         except ImportError:
             return f"File: {filename}\n[PDF parsing requires pypdf. Install with: pip install pypdf]"
@@ -223,14 +223,14 @@ def _parse_file(filename: str, content: bytes) -> str:
     elif ext in ("lst", "ctl", "mod", "ext", "cov", "cor", "txt", "json"):
         text = content.decode("utf-8", errors="replace")
         if len(text) > 8000:
-            text = text[:8000] + f"\n\n... [truncated, total {len(text)} chars]"
+            text = text[:40000] + f"\n\n... [truncated, total {len(text)} chars]"
         return f"File: {filename}\n\n{text}"
 
     else:
         try:
             text = content.decode("utf-8", errors="replace")
             if len(text) > 4000:
-                text = text[:4000] + f"\n... [truncated]"
+                text = text[:20000] + f"\n... [truncated]"
             return f"File: {filename}\n\n{text}"
         except Exception:
             return f"File: {filename}\n[Binary file — cannot display content]"
