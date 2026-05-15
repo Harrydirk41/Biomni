@@ -91,18 +91,27 @@ _CHAT_HTML = """<!DOCTYPE html>
   // ── Init ──
   window.onload = async () => {
     sessionId = localStorage.getItem('biomni_session');
-    if (sessionId) await loadSession(sessionId);
-    else await newChat();
-    await loadSessionList();
+    try {
+      if (sessionId) await loadSession(sessionId);
+      else await newChat();
+      await loadSessionList();
+    } catch(e) {
+      console.warn('Memory unavailable, running without sessions:', e);
+      sessionId = 'local-' + Date.now();
+    }
   };
 
   async function newChat() {
-    const res = await fetch('/sessions', {method:'POST'});
-    const data = await res.json();
-    sessionId = data.session_id;
+    try {
+      const res = await fetch('/sessions', {method:'POST'});
+      const data = await res.json();
+      sessionId = data.session_id || ('local-' + Date.now());
+    } catch(e) {
+      sessionId = 'local-' + Date.now();
+    }
     localStorage.setItem('biomni_session', sessionId);
     messages.innerHTML = '<div class="msg agent">Hello! I\'m the Biomni PKPD Agent. I remember facts from previous sessions. Ask me anything about pharmacokinetics, NCA, PopPK, DMPK, or attach a file.</div>';
-    await loadSessionList();
+    try { await loadSessionList(); } catch(e) {}
   }
 
   async function loadSession(id) {
@@ -126,14 +135,16 @@ _CHAT_HTML = """<!DOCTYPE html>
   }
 
   async function loadSessionList() {
-    const res = await fetch('/sessions');
-    const data = await res.json();
-    const container = document.getElementById('sessions');
-    container.innerHTML = data.map(s =>
-      `<div class="sess-item ${s.session_id === sessionId ? 'active' : ''}"
-            onclick="switchSession('${s.session_id}')"
-            title="${escHtml(s.title || 'Conversation')}">${escHtml(s.title || 'Conversation')}</div>`
-    ).join('');
+    try {
+      const res = await fetch('/sessions');
+      const data = await res.json();
+      const container = document.getElementById('sessions');
+      container.innerHTML = data.map(s =>
+        `<div class="sess-item ${s.session_id === sessionId ? 'active' : ''}"
+              onclick="switchSession('${s.session_id}')"
+              title="${escHtml(s.title || 'Conversation')}">${escHtml(s.title || 'Conversation')}</div>`
+      ).join('');
+    } catch(e) {}
   }
 
   // ── Input ──
