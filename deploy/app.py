@@ -397,19 +397,25 @@ async def run_agent(req: PromptRequest):
         raise HTTPException(status_code=400, detail="prompt must not be empty")
 
     full_prompt = req.prompt
-    if _MEMORY_ENABLED and req.session_id:
-        from memory import build_prompt, add_message
-        full_prompt = build_prompt(req.prompt, req.session_id)
-        add_message(req.session_id, "user", req.prompt, title_hint=req.prompt)
+    if _MEMORY_ENABLED and req.session_id and not req.session_id.startswith("local-"):
+        try:
+            from memory import build_prompt, add_message
+            full_prompt = build_prompt(req.prompt, req.session_id)
+            add_message(req.session_id, "user", req.prompt, title_hint=req.prompt)
+        except Exception:
+            pass
 
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, _agent.go, full_prompt)
     result_str = str(result)
 
-    if _MEMORY_ENABLED and req.session_id:
-        from memory import add_message, extract_and_store_memory
-        add_message(req.session_id, "agent", result_str)
-        loop.run_in_executor(None, extract_and_store_memory, req.prompt, result_str, req.session_id, _agent.llm)
+    if _MEMORY_ENABLED and req.session_id and not req.session_id.startswith("local-"):
+        try:
+            from memory import add_message, extract_and_store_memory
+            add_message(req.session_id, "agent", result_str)
+            loop.run_in_executor(None, extract_and_store_memory, req.prompt, result_str, req.session_id, _agent.llm)
+        except Exception:
+            pass
 
     return PromptResponse(result=result_str)
 
@@ -428,19 +434,25 @@ async def run_agent_with_files(
     base_prompt = f"{prompt}\n\n=== UPLOADED FILES ===\n\n{file_context}" if file_context else prompt
 
     full_prompt = base_prompt
-    if _MEMORY_ENABLED and session_id:
-        from memory import build_prompt, add_message
-        full_prompt = build_prompt(base_prompt, session_id)
-        add_message(session_id, "user", prompt or "Uploaded file(s)", title_hint=prompt or f.filename if files else "File upload")
+    if _MEMORY_ENABLED and session_id and not session_id.startswith("local-"):
+        try:
+            from memory import build_prompt, add_message
+            full_prompt = build_prompt(base_prompt, session_id)
+            add_message(session_id, "user", prompt or "Uploaded file(s)", title_hint=prompt or "File upload")
+        except Exception:
+            pass
 
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, _agent.go, full_prompt)
     result_str = str(result)
 
-    if _MEMORY_ENABLED and session_id:
-        from memory import add_message, extract_and_store_memory
-        add_message(session_id, "agent", result_str)
-        loop.run_in_executor(None, extract_and_store_memory, base_prompt[:400], result_str, session_id, _agent.llm)
+    if _MEMORY_ENABLED and session_id and not session_id.startswith("local-"):
+        try:
+            from memory import add_message, extract_and_store_memory
+            add_message(session_id, "agent", result_str)
+            loop.run_in_executor(None, extract_and_store_memory, base_prompt[:400], result_str, session_id, _agent.llm)
+        except Exception:
+            pass
 
     return PromptResponse(result=result_str)
 
