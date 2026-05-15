@@ -69,7 +69,7 @@ _CHAT_HTML = """<!DOCTYPE html>
   </div>
   <div id="main">
     <div id="messages">
-      <div class="msg agent">Hello! I'm the Biomni PKPD Agent with memory. I remember facts from previous sessions and maintain context within our conversation.<br><br>Ask me anything about pharmacokinetics, NCA, PopPK, DMPK, or CDISC — or attach a file (CSV, NONMEM, Excel, PDF).</div>
+      <div class="msg agent">Hello! I am the Biomni PKPD Agent with memory. I remember facts from previous sessions and maintain context within our conversation.<br><br>Ask me anything about pharmacokinetics, NCA, PopPK, DMPK, or CDISC — or attach a file (CSV, NONMEM, Excel, PDF).</div>
     </div>
     <div id="file-preview"></div>
     <div id="input-row">
@@ -110,7 +110,7 @@ _CHAT_HTML = """<!DOCTYPE html>
       sessionId = 'local-' + Date.now();
     }
     localStorage.setItem('biomni_session', sessionId);
-    messages.innerHTML = '<div class="msg agent">Hello! I\'m the Biomni PKPD Agent. I remember facts from previous sessions. Ask me anything about pharmacokinetics, NCA, PopPK, DMPK, or attach a file.</div>';
+    messages.innerHTML = "<div class='msg agent'>Hello! I am the Biomni PKPD Agent. I remember facts from previous sessions. Ask me anything about pharmacokinetics, NCA, PopPK, DMPK, or attach a file.</div>";
     try { await loadSessionList(); } catch(e) {}
   }
 
