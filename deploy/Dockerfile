@@ -35,8 +35,9 @@ WORKDIR /app
 COPY biomni/           ./biomni/
 COPY pyproject.toml    ./
 COPY MANIFEST.in       ./
-RUN pip install --no-cache-dir -e . --no-deps \
- && pip install --no-cache-dir --no-deps langchain-aws
+RUN /opt/conda/envs/biomni_e1/bin/pip install --no-cache-dir -e . --no-deps \
+ && /opt/conda/envs/biomni_e1/bin/pip install --no-cache-dir --no-deps langchain-aws \
+ && /opt/conda/envs/biomni_e1/bin/python -c "from langchain_aws import ChatBedrock; print('langchain_aws OK')"
 
 # Copy deployment helpers
 COPY deploy/app.py            ./app.py
