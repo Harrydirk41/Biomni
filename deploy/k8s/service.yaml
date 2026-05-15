@@ -1,0 +1,17 @@
+# ClusterIP: internal only — Ingress routes external traffic to this
+apiVersion: v1
+kind: Service
+metadata:
+  name: biomni-api
+  namespace: biomni
+  labels:
+    app: biomni-api
+spec:
+  type: ClusterIP
+  selector:
+    app: biomni-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP

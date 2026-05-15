@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biomni-config
+  namespace: biomni
+data:
+  AWS_REGION: "us-west-2"
+  BEDROCK_MODEL_ID: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  LLM_SOURCE: "Bedrock"
+  BIOMNI_SKIP_DATALAKE: "true"
+  BIOMNI_SESSIONS_TABLE: "biomni-sessions"
+  BIOMNI_MEMORY_TABLE: "biomni-memory"
+  PYTHONUNBUFFERED: "1"

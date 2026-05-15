@@ -1,0 +1,41 @@
+# Horizontal Pod Autoscaler
+# Scales 2→10 pods based on CPU and memory usage.
+# Each PKPD query is CPU-heavy so CPU is the primary signal.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: biomni-api
+  namespace: biomni
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: biomni-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60    # scale up when avg CPU > 60%
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60   # wait 60s before scaling up again
+      policies:
+        - type: Pods
+          value: 2                      # add at most 2 pods at a time
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300  # wait 5min before scaling down
+      policies:
+        - type: Pods
+          value: 1                      # remove 1 pod at a time
+          periodSeconds: 120
