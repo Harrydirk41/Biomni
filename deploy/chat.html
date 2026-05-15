@@ -20,7 +20,22 @@
   #memory-badge { margin: 8px 10px; padding: 6px 10px; background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.3); border-radius: 6px; font-size: 11px; color: rgba(255,220,100,0.9); }
   #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-  .msg { max-width: 88%; padding: 11px 15px; border-radius: 12px; line-height: 1.55; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .msg { max-width: 88%; padding: 11px 15px; border-radius: 12px; line-height: 1.55; font-size: 14px; word-break: break-word; }
+  .msg.user { white-space: pre-wrap; }
+  .msg.agent { white-space: normal; }
+  .msg h1,.msg h2,.msg h3 { font-size: 1em; font-weight: 700; margin: 10px 0 4px; }
+  .msg p { margin: 6px 0; }
+  .msg ul,.msg ol { margin: 4px 0 4px 18px; }
+  .msg li { margin: 2px 0; }
+  .msg code { background: rgba(0,0,0,0.07); border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 13px; }
+  .msg pre { background: rgba(0,0,0,0.07); border-radius: 6px; padding: 10px; overflow-x: auto; margin: 8px 0; }
+  .msg pre code { background: none; padding: 0; }
+  .msg strong { font-weight: 700; }
+  .msg em { font-style: italic; }
+  .msg table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+  .msg th,.msg td { border: 1px solid #ccc; padding: 4px 8px; }
+  .msg th { background: rgba(0,0,0,0.08); font-weight: 700; }
+  .msg hr { border: none; border-top: 1px solid #ddd; margin: 10px 0; }
   .user { align-self: flex-end; background: #1a1a2e; color: white; border-bottom-right-radius: 4px; }
   .agent { align-self: flex-start; background: #f0f2f5; color: #1a1a2e; border-bottom-left-radius: 4px; }
   .thinking { opacity: 0.45; font-style: italic; }
@@ -117,7 +132,8 @@
         if (msgs.length === 0) return;
         messagesEl.innerHTML = '';
         msgs.forEach(function(msg) {
-          appendMessage(msg.role === 'user' ? 'user' : 'agent', msg.content);
+          var role = msg.role === 'user' ? 'user' : 'agent';
+          appendMessage(role, role === 'agent' ? extractSolution(msg.content) : msg.content);
         });
         messagesEl.scrollTop = messagesEl.scrollHeight;
       });
@@ -207,8 +223,7 @@
     }
 
     promise.then(function(data) {
-      thinking.className = 'msg agent';
-      thinking.textContent = extractSolution(data.result || data.detail || 'No response');
+      setAgentMessage(thinking, extractSolution(data.result || data.detail || 'No response'));
     }).catch(function(e) {
       thinking.className = 'msg agent';
       thinking.textContent = 'Error: ' + e.message;
@@ -223,10 +238,20 @@
   function appendMessage(role, text, html, isThinking) {
     var el = document.createElement('div');
     el.className = 'msg ' + role + (isThinking ? ' thinking' : '');
-    if (html) el.innerHTML = html;
-    else el.textContent = text || '';
+    if (html) {
+      el.innerHTML = html;
+    } else if (role === 'agent' && !isThinking) {
+      el.innerHTML = renderMarkdown(text || '');
+    } else {
+      el.textContent = text || '';
+    }
     messagesEl.appendChild(el);
     return el;
+  }
+
+  function setAgentMessage(el, text) {
+    el.className = 'msg agent';
+    el.innerHTML = renderMarkdown(text);
   }
 
   function extractSolution(raw) {
@@ -234,20 +259,102 @@
     var m = raw.match(/<solution>([\s\S]*?)<\/solution>/);
     if (m) return m[1].trim();
 
-    // Strip all XML-style tags and their content except observation
+    // Strip execute blocks entirely
     raw = raw.replace(/<execute>[\s\S]*?<\/execute>/g, '');
+
+    // Replace observation blocks with [Result] section
     raw = raw.replace(/<observation>([\s\S]*?)<\/observation>/g, function(_, obs) {
-      return '\n[Result]\n' + obs.trim() + '\n';
+      return '\n\n**[Result]**\n' + obs.trim() + '\n';
     });
+
+    // Strip remaining XML-style tags
     raw = raw.replace(/<[^>]+>/g, '');
 
     // Strip agent message headers like === Ai Message ===
-    raw = raw.replace(/={10,}[\s\S]*?={10,}/g, '');
+    raw = raw.replace(/={5,}[^\n]*={5,}\n?/g, '');
 
     // Strip "Thinking Process:" sections
-    raw = raw.replace(/\*\*Thinking Process:\*\*[\s\S]*?(?=\*\*|$)/g, '');
+    raw = raw.replace(/\*\*Thinking Process:\*\*[\s\S]*?(?=\n\*\*[^*]|$)/g, '');
+
+    // Fix literal \n sequences that weren't actual newlines
+    raw = raw.replace(/\\n\\n/g, '\n\n').replace(/\\n/g, '\n');
 
     return raw.trim();
+  }
+
+  function renderMarkdown(text) {
+    // Escape HTML first
+    var s = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Fenced code blocks ```lang\n...\n```
+    s = s.replace(/```([^\n]*)\n([\s\S]*?)```/g, function(_, lang, code) {
+      return '<pre><code>' + code + '</code></pre>';
+    });
+
+    // Inline code `...`
+    s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+    // Tables (| ... | ... |)
+    s = s.replace(/((?:\|[^\n]*\|\n?)+)/g, function(block) {
+      var rows = block.trim().split('\n').filter(function(r) { return r.trim(); });
+      if (rows.length < 1) return block;
+      var isHeader = rows.length > 1 && /^\|[\s\-:|]+\|/.test(rows[1]);
+      var html = '<table>';
+      rows.forEach(function(row, i) {
+        if (isHeader && i === 1) return; // skip separator row
+        var tag = (isHeader && i === 0) ? 'th' : 'td';
+        var cells = row.replace(/^\||\|$/g, '').split('|');
+        html += '<tr>' + cells.map(function(c) {
+          return '<' + tag + '>' + c.trim() + '</' + tag + '>';
+        }).join('') + '</tr>';
+      });
+      return html + '</table>';
+    });
+
+    // HR ---
+    s = s.replace(/^---+\s*$/gm, '<hr>');
+
+    // Headers ### ## #
+    s = s.replace(/^### ([^\n]+)/gm, '<h3>$1</h3>');
+    s = s.replace(/^## ([^\n]+)/gm, '<h2>$1</h2>');
+    s = s.replace(/^# ([^\n]+)/gm, '<h1>$1</h1>');
+
+    // Bold **text** and __text__
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+
+    // Italic *text* and _text_
+    s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    s = s.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+
+    // Unordered lists - item or * item
+    s = s.replace(/^[ \t]*[-*] (.+)/gm, '<li>$1</li>');
+    s = s.replace(/(<li>.*<\/li>)(?:\n(?!<li>)|$)/gs, '<ul>$1</ul>');
+    // Collapse consecutive <li> not already in ul
+    s = s.replace(/<\/li>\n<li>/g, '</li><li>');
+
+    // Ordered lists  1. item
+    s = s.replace(/^[ \t]*\d+\. (.+)/gm, '<oli>$1</oli>');
+    s = s.replace(/(<oli>.*<\/oli>)/gs, '<ol>$1</ol>');
+    s = s.replace(/<\/oli>\n?<oli>/g, '</li><li>');
+    s = s.replace(/<oli>/g, '<li>').replace(/<\/oli>/g, '</li>');
+
+    // Paragraphs: double newline => paragraph break
+    s = s.replace(/\n\n+/g, '</p><p>');
+    s = '<p>' + s + '</p>';
+
+    // Single newlines inside paragraphs => <br>
+    s = s.replace(/([^>])\n([^<])/g, '$1<br>$2');
+
+    // Clean up empty paragraphs
+    s = s.replace(/<p>\s*<\/p>/g, '');
+    s = s.replace(/<p>(<(?:h[123]|ul|ol|pre|table|hr)[^>]*>)/g, '$1');
+    s = s.replace(/(<\/(?:h[123]|ul|ol|pre|table|hr)>)<\/p>/g, '$1');
+
+    return s;
   }
 
   function escHtml(s) {
