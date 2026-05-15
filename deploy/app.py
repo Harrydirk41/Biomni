@@ -19,6 +19,7 @@ _agent: A1 = None
 
 
 def _build_agent() -> A1:
+    skip_datalake = os.environ.get("BIOMNI_SKIP_DATALAKE", "false").lower() == "true"
     return A1(
         path=os.environ.get("BIOMNI_DATA_PATH", "./data"),
         llm=os.environ.get("BIOMNI_LLM", "claude-sonnet-4-20250514"),
@@ -29,6 +30,7 @@ def _build_agent() -> A1:
         or None,
         commercial_mode=os.environ.get("BIOMNI_COMMERCIAL_MODE", "false").lower()
         == "true",
+        expected_data_lake_files=[] if skip_datalake else None,
     )
 
 
