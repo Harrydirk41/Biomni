@@ -35,7 +35,8 @@ WORKDIR /app
 COPY biomni/           ./biomni/
 COPY pyproject.toml    ./
 COPY MANIFEST.in       ./
-RUN pip install --no-cache-dir -e . --no-deps
+RUN pip install --no-cache-dir -e . --no-deps \
+ && pip install --no-cache-dir langchain-aws
 
 # Copy deployment helpers
 COPY deploy/app.py            ./app.py
