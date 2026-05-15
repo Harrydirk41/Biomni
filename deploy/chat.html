@@ -230,8 +230,23 @@
   }
 
   function extractSolution(raw) {
+    // Try to extract <solution> block first
     var m = raw.match(/<solution>([\s\S]*?)<\/solution>/);
     if (m) return m[1].trim();
+
+    // Strip all XML-style tags and their content except observation
+    raw = raw.replace(/<execute>[\s\S]*?<\/execute>/g, '');
+    raw = raw.replace(/<observation>([\s\S]*?)<\/observation>/g, function(_, obs) {
+      return '\n[Result]\n' + obs.trim() + '\n';
+    });
+    raw = raw.replace(/<[^>]+>/g, '');
+
+    // Strip agent message headers like === Ai Message ===
+    raw = raw.replace(/={10,}[\s\S]*?={10,}/g, '');
+
+    // Strip "Thinking Process:" sections
+    raw = raw.replace(/\*\*Thinking Process:\*\*[\s\S]*?(?=\*\*|$)/g, '');
+
     return raw.trim();
   }
 
