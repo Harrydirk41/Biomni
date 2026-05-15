@@ -36,7 +36,7 @@ COPY biomni/           ./biomni/
 COPY pyproject.toml    ./
 COPY MANIFEST.in       ./
 RUN pip install --no-cache-dir -e . --no-deps \
- && pip install --no-cache-dir langchain-aws
+ && pip install --no-cache-dir --no-deps langchain-aws
 
 # Copy deployment helpers
 COPY deploy/app.py            ./app.py
