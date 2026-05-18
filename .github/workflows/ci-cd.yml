@@ -402,7 +402,9 @@ jobs:
             langgraph \
             numpy \
             pandas \
-            scipy
+            scipy \
+            python-dotenv \
+            tqdm
           pip install -e . --no-deps
 
       - name: Upload dataset (idempotent — recreates if changed)
